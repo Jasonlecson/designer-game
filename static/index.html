@@ -1553,7 +1553,7 @@ function renderAll() {
   document.getElementById('sb-turn').textContent = gameState.turn_count;
   document.getElementById('sb-credit').textContent = attrs['表达能力'] || 5;
   document.getElementById('sb-portfolio').textContent = attrs['作品集厚度'] || 1;
-  document.getElementById('sb-stamina').textContent = gameState.stamina || 80;
+  document.getElementById('sb-stamina').textContent = gameState.stamina ?? 80;
   const sav = gameState.savings || 3000;
   document.getElementById('sb-savings').textContent = sav >= 10000 ? (sav/10000).toFixed(1)+'w' : (sav/1000).toFixed(0)+'k';
   // Show monthly salary as title tooltip on the savings item
@@ -1586,10 +1586,10 @@ function renderAll() {
   // S2: Stamina status
   const staminaEl = document.getElementById('sb-stamina');
   const statusText = gameState.stamina_status || '正常';
-  staminaEl.parentElement.innerHTML = `<div class="player-meta-val" id="sb-stamina">${gameState.stamina || 80}<span class="stamina-status stamina-status-${getStaminaClass(statusText)}">${statusText}</span></div><div class="player-meta-label">精力</div>`;
+  staminaEl.parentElement.innerHTML = `<div class="player-meta-val" id="sb-stamina">${gameState.stamina ?? 80}<span class="stamina-status stamina-status-${getStaminaClass(statusText)}">${statusText}</span></div><div class="player-meta-label">精力</div>`;
   // I5d: Mobile stamina/savings
   const msEl = document.getElementById('mobile-stamina');
-  if (msEl) msEl.textContent = gameState.stamina || 80;
+  if (msEl) msEl.textContent = gameState.stamina ?? 80;
   const msSav = document.getElementById('mobile-savings');
   if (msSav) {
     const sav = gameState.savings || 3000;
