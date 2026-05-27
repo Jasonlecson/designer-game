@@ -697,6 +697,9 @@ body {
   font-size: 0.85rem;
 }
 
+/* Mobile-only attribute panel */
+.mobile-attrs { display: none; }
+
 /* Tab content visibility */
 .tab-content { display: none; }
 .tab-content.active { display: block; }
@@ -806,6 +809,7 @@ body {
 
   /* Sidebar hidden, no menu toggle needed since config is in topbar */
   #sidebar { display: none; }
+  .mobile-attrs { display: block; }
 
   /* Cover adjustments */
   .cover-content { padding: 24px 20px; }
@@ -1025,6 +1029,14 @@ body {
             </div>
             <div class="panel-body" id="event-narrative"></div>
             <div class="event-choices" id="event-choices"></div>
+          </div>
+          <div class="panel mobile-attrs">
+            <div class="panel-header">
+              <span class="panel-title">📊 能力属性</span>
+            </div>
+            <div class="panel-body" style="padding:12px 16px">
+              <div id="mobile-attrs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
+            </div>
           </div>
           <div class="panel">
             <div class="panel-header">
@@ -1328,6 +1340,8 @@ function renderAll() {
 
   // Sidebar attributes
   renderAttrs(attrs);
+  // Mobile attributes
+  renderMobileAttrs(attrs);
   // Sidebar NPCs
   renderSidebarNPCs(gameState.npcs || []);
 
@@ -1411,6 +1425,27 @@ function renderDashboard() {
     choicesEl.innerHTML = '';
     choicesEl.onclick = null;
   }
+
+  // Mobile attributes
+  renderMobileAttrs(gameState.attributes);
+}
+
+function renderMobileAttrs(attrs) {
+  const el = document.getElementById('mobile-attrs');
+  if (!el) return;
+  const icons = { '审美判断力': '🎨', '执行力': '🔧', '商业理解力': '💼', '表达与说服力': '🗣', '行业信用': '🤝', '自主判断力': '🧭', '作品集厚度': '📦', '抗压阈值': '⚡' };
+  let html = '';
+  for (const [k, v] of Object.entries(attrs)) {
+    const cls = v >= 7 ? 'var(--success)' : v >= 4 ? 'var(--accent-light)' : '#d4846a';
+    html += `<div>
+      <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:2px">
+        <span style="font-size:0.72rem;color:var(--text-secondary)">${icons[k]||''} ${k}</span>
+        <span style="font-size:0.8rem;font-weight:700;color:${cls}">${v}</span>
+      </div>
+      <div class="attr-bar" style="background:var(--surface-2)"><div class="attr-fill" style="width:${v*10}%;background:${cls}"></div></div>
+    </div>`;
+  }
+  el.innerHTML = html;
 }
 
 // Log list (dashboard bottom-left panel)
