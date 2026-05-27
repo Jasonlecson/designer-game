@@ -2,15 +2,16 @@
 # -*- coding: utf-8 -*-
 '平面设计师职业生涯模拟器 - 游戏服务器 v2'
 
-import json, os, random, traceback
+import json, os, random, traceback, uuid
 from datetime import datetime, timedelta
-from flask import Flask, request, jsonify, send_from_directory
+from flask import Flask, request, jsonify, send_from_directory, session
 
 app = Flask(__name__, static_folder='static', static_url_path='')
+app.secret_key = os.environ.get('SECRET_KEY', 'designer-game-' + uuid.uuid4().hex[:16])
 
 BASE_DIR = os.path.dirname(__file__)
-STATE_FILE = os.path.join(BASE_DIR, 'game_state.json')
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
+PLAYERS_DIR = os.path.join(BASE_DIR, 'players')
 
 # ============================================================
 # Time / Calendar System — 真实日历 + 季节事件
@@ -56,7 +57,41 @@ def get_season_llm_hint(month):
     return {'tag': '日常', 'hint': ''}
 
 # ============================================================
-# Config
+# Session-based State Management — 多玩家隔离
+# ============================================================
+def ensure_players_dir():
+    if not os.path.exists(PLAYERS_DIR):
+        os.makedirs(PLAYERS_DIR)
+
+def get_session_id():
+    '''Generate or retrieve persistent session ID.'''
+    if 'player_id' not in session:
+        session['player_id'] = uuid.uuid4().hex[:12]
+        session.permanent = True
+    return session['player_id']
+
+def get_state_file():
+    pid = get_session_id()
+    ensure_players_dir()
+    return os.path.join(PLAYERS_DIR, f'state_{pid}.json')
+
+def load_state():
+    path = get_state_file()
+    if os.path.exists(path):
+        with open(path, 'r', encoding='utf-8') as f:
+            return json.load(f)
+    return None
+
+def save_state(state):
+    path = get_state_file()
+    ensure_players_dir()
+    tmp = path + '.tmp'
+    with open(tmp, 'w', encoding='utf-8') as f:
+        json.dump(state, f, ensure_ascii=False, indent=2)
+    os.replace(tmp, path)
+
+# ============================================================
+# Config (shared — one server, one API key)
 # ============================================================
 def load_config():
     if os.path.exists(CONFIG_FILE):
@@ -1441,10 +1476,11 @@ def api_export():
 
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
-    if os.path.exists(STATE_FILE):
-        os.remove(STATE_FILE)
-    if os.path.exists(STATE_FILE + '.tmp'):
-        os.remove(STATE_FILE + '.tmp')
+    path = get_state_file()
+    if os.path.exists(path):
+        os.remove(path)
+    if os.path.exists(path + '.tmp'):
+        os.remove(path + '.tmp')
     return jsonify({'ok': True})
 
 # ============================================================
@@ -1639,18 +1675,20 @@ def api_active_action():
 # ============================================================
 # I4-P2: Multi-Save System
 # ============================================================
-SAVES_DIR = os.path.join(BASE_DIR, 'saves')
+SAVES_DIR = os.path.join(BASE_DIR, 'players')
 
-def ensure_saves_dir():
-    if not os.path.exists(SAVES_DIR):
-        os.makedirs(SAVES_DIR)
+def get_saves_dir():
+    d = os.path.join(PLAYERS_DIR, get_session_id(), 'saves')
+    if not os.path.exists(d):
+        os.makedirs(d)
+    return d
 
 def get_save_path(slot):
-    return os.path.join(SAVES_DIR, f'slot_{slot}.json')
+    return os.path.join(get_saves_dir(), f'slot_{slot}.json')
 
 @app.route('/api/saves', methods=['GET'])
 def api_saves_list():
-    ensure_saves_dir()
+    get_saves_dir()
     slots = {}
     for i in range(1, 6):
         path = get_save_path(i)
@@ -1674,7 +1712,7 @@ def api_saves_save():
     state = load_state()
     if not state:
         return jsonify({'error': '没有当前存档'}), 400
-    ensure_saves_dir()
+    get_saves_dir()
     with open(get_save_path(slot), 'w', encoding='utf-8') as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
     return jsonify({'ok': True, 'slot': slot})
