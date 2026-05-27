@@ -1403,7 +1403,7 @@ async function startGame() {
     if (ci) currentPlayer.custom_origin = ci.value;
   }
   showGame();
-  document.getElementById('event-narrative').innerHTML = '<div class="loading-state"><div class="loading-dots"><span></span><span></span><span></span></div><div>AI 正在生成你的设计师生涯…</div></div>';
+  document.getElementById('event-narrative').innerHTML = '<div class="loading-state"><div class="loading-dots"><span></span><span></span><span></span></div></div>';
   document.getElementById('event-choices').innerHTML = '';
   isProcessing = true;
 
@@ -1582,7 +1582,7 @@ function renderDashboard() {
   if (last?.narrative) {
     narrativeEl.innerHTML = `<div class="event-narrative">${formatNarrative(last.narrative)}</div>`;
   } else {
-    narrativeEl.innerHTML = '<div class="loading-state">等待 AI 生成…</div>';
+    narrativeEl.innerHTML = '<div class="loading-state"><div class="loading-dots"><span></span><span></span><span></span></div></div>';
   }
 
   // Choices
