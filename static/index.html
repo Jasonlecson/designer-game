@@ -1861,7 +1861,7 @@ async function makeChoice(choiceId) {
 
   const choicesEl = document.getElementById('event-choices');
   if (choicesEl) {
-    choicesEl.innerHTML = '<div class="loading-state" style="padding:16px"><div class="loading-dots"><span></span><span></span><span></span></div><div style="font-size:0.8rem">AI 生成中…</div></div>';
+    choicesEl.innerHTML = '<div class="loading-state" style="padding:16px"><div class="loading-dots"><span></span><span></span><span></span></div></div>';
   }
 
   try {
@@ -2032,7 +2032,7 @@ async function doActiveAction(actionKey) {
 
   const choicesEl = document.getElementById('event-choices');
   if (choicesEl) {
-    choicesEl.innerHTML = '<div class="loading-state" style="padding:16px"><div class="loading-dots"><span></span><span></span><span></span></div><div style="font-size:0.8rem">AI 叙述中…</div></div>';
+    choicesEl.innerHTML = '<div class="loading-state" style="padding:16px"><div class="loading-dots"><span></span><span></span><span></span></div></div>';
   }
 
   try {
