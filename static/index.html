@@ -2,7 +2,9 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <title>平面设计师模拟器 · 职业生涯版</title>
 <style>
 /* ============================================================
@@ -66,7 +68,9 @@ body {
   background: var(--surface-0);
   color: var(--text-primary);
   line-height: 1.6;
-  height: 100vh;
+  height: 100vh; height: 100dvh;
+  overflow-x: hidden;
+  -webkit-text-size-adjust: 100%;
 }
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
@@ -83,7 +87,7 @@ body {
    COVER SCREEN
    ============================================================ */
 #cover-screen {
-  height: 100vh;
+  height: 100vh; height: 100dvh;
   flex-direction: column;
   align-items: center;
   justify-content: center;
