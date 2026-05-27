@@ -1029,6 +1029,76 @@ body {
   .npc-panel-grid { grid-template-columns: 1fr; }
   .timeline-card-header { flex-direction: column; align-items: flex-start; gap: 4px; }
 }
+
+/* ============================================================
+   COMPREHENSIVE MOBILE OPTIMIZATION
+   ============================================================ */
+@media (max-width: 860px) {
+  /* Notifications: full-width from top */
+  .notification {
+    left: 12px; right: 12px; max-width: none;
+    top: auto; bottom: 12px;
+    font-size: 0.78rem; padding: 12px 16px;
+  }
+
+  /* Modal dialogs */
+  .modal { padding: 16px; margin: 12px; width: auto; }
+  .modal h3 { font-size: 1rem; margin-bottom: 14px; }
+  .modal .field label { font-size: 0.7rem; }
+  .modal .btn-row { flex-direction: column; }
+  .modal .btn-row .btn { width: 100%; }
+
+  /* Ending overlay */
+  .ending-card { padding: 24px 16px; margin: 12px; }
+  .ending-card .ending-icon { font-size: 2.5rem; }
+  .ending-card .ending-title { font-size: 1.2rem; }
+  .ending-card .ending-text { font-size: 0.88rem; }
+
+  /* Config modal specific */
+  #config-modal .modal { max-height: 80vh; overflow-y: auto; }
+
+  /* Create screen */
+  .create-container { padding: 16px 12px; }
+  .select-grid { gap: 8px; }
+  .select-card { padding: 10px 12px; }
+  .select-card .select-title { font-size: 0.82rem; }
+  .select-card .select-desc { font-size: 0.7rem; }
+  .create-nav { gap: 4px; }
+  .create-nav .btn { padding: 8px 16px; font-size: 0.78rem; }
+
+  /* Portfolio */
+  .portfolio-showcase { gap: 10px; }
+  #portfolio-grid { grid-template-columns: repeat(2, 1fr) !important; }
+
+  /* Active actions submenu */
+  #active-submenu .aa-btn { font-size: 0.75rem; padding: 10px 14px; }
+  .aa-btn { min-height: 42px; }
+
+  /* Mobile attributes panel */
+  .mobile-attrs .panel-body { padding: 8px 12px !important; }
+  #mobile-attrs { gap: 6px !important; }
+  #mobile-attrs > div { padding: 4px 0; }
+
+  /* Event narrative */
+  .event-narrative { font-size: 0.92rem !important; line-height: 1.85 !important; }
+
+  /* Choice buttons */
+  .choice-btn { padding: 14px; }
+  .choice-btn .ch-letter { font-size: 0.85rem; min-width: 28px; }
+  .choice-btn .ch-text { font-size: 0.88rem; }
+  .choice-btn .ch-hint { font-size: 0.7rem; }
+  .choice-btn .ch-effect { font-size: 0.65rem; }
+
+  /* Enlarge clickable areas */
+  .tab-btn { padding: 12px 16px; font-size: 0.78rem; }
+  .log-item { padding: 12px 14px; }
+
+  /* Safe area for iPhone notch */
+  padding-bottom: env(safe-area-inset-bottom, 0);
+
+  /* Hide less important elements */
+  .topbar-event-tag { display: none; }
+}
 </style>
 </head>
 <body>
