@@ -1308,6 +1308,8 @@ def api_action():
     action_text = data.get('action', '')
 
     # Apply the chosen effect BEFORE calling LLM
+    # Reset NPC interaction tracking for new turn
+    state['_npc_interacted'] = {}
     chosen_effect = ''
     if choice_id and not action_text:
         last_entry = state['story_log'][-1] if state['story_log'] else None
@@ -1534,9 +1536,6 @@ def api_npc_interact():
     state = load_state()
     if not state:
         return jsonify({'error': '没有存档'}), 404
-    cfg = load_config()
-    if not cfg.get('api_key'):
-        return jsonify({'error': '请先配置 API Key'}), 400
 
     data = request.get_json()
     npc_id = data.get('npc_id')
@@ -1545,6 +1544,12 @@ def api_npc_interact():
     npc = next((n for n in npcs if n.get('id') == npc_id), None)
     if not npc:
         return jsonify({'error': 'NPC 不存在'}), 404
+
+    # One interaction per NPC per turn
+    interacted = state.get('_npc_interacted', {})
+    if interacted.get(npc_id):
+        return jsonify({'error': f'本回合已经和{npc["name"]}互动过了'}), 400
+
     role = npc.get('role', '职场关系')
     interactions = NPC_INTERACTIONS.get(role, NPC_INTERACTIONS['职场关系'])
     action = next((a for a in interactions if a['id'] == action_id), None)
@@ -1556,7 +1561,7 @@ def api_npc_interact():
         return jsonify({'error': '精力不足'}), 400
     state['stamina'] = max(0, min(100, stamina - cost))
 
-    # Apply deterministic attribute effects
+    # Apply effects — changes state, which influences next LLM call
     effect = action['effect']
     attrs = state.get('attributes', {})
     for short, full in [('审美', '审美判断力'), ('执行', '执行能力'), ('商业', '商业思维'),
@@ -1567,66 +1572,33 @@ def api_npc_interact():
             attrs[full] = max(1, attrs.get(full, 5) - 1)
     state['attributes'] = attrs
 
+    # Update NPC relation
     if npc.get('relation') == '待剧情展开':
         npc['relation'] = '已建立联系'
+    # Deepen relation slightly
+    rel_bonus = {'请教':'更熟悉了', '展示':'对你的作品有了印象', '内推':'在帮你留意机会',
+                 '讨论':'建立了初步信任', '提交':'对你的执行力有了认知', '争取':'认可你的商业意识',
+                 '聊聊':'对你印象不错', '分享':'觉得你很有洞察力',
+                 '一起':'合作默契在增长', '头脑':'创意碰撞有火花', '推荐':'商业互信+1',
+                 '随意':'轻松相处', '请教工作':'对你的专业能力有认知'}
+    for key, rel in rel_bonus.items():
+        if key in action['text']:
+            npc['relation'] = rel
+            break
 
-    # Advance turn and call LLM for narrative
-    turn = state['turn_count'] + 1
-    state['turn_count'] = turn
-
-    action_context = f'主动行动：与{npc["name"]}（{npc["role"]}）互动——{action["text"]}。{effect}'
-    messages = build_messages(state, action_context)
-    result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
-    if error:
-        result = validate_and_fix_result({}, state['turn_count'], state['attributes'])
-    result = validate_and_fix_result(result, state['turn_count'], state['attributes'])
-
-    if result.get('npc_updates'):
-        state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
-    if result.get('company_update'):
-        apply_company_update(state, result['company_update'])
-
-    entry = {
-        'turn': turn, 'player_action': f'与{npc["name"]}互动',
-        'narrative': result['narrative'], 'choices': result['choices'],
-        'atmosphere': result.get('atmosphere', '日常'),
-        'attr_display': state['attributes'].copy(),
-        'event_tag': result.get('event_tag', '日常'),
-    }
-    state['story_log'].append(entry)
-    state['attributes'] = result.get('attr_display', state['attributes'])
-
-    # Run all post-turn systems
-    arc_msg = detect_and_start_arc(state)
-    challenge = check_career_challenge(state)
-    economy_event = process_economy(state)
-    crisis_event = check_savings_crisis(state)
-    project_phase_hint = advance_project_phase(state)
-    prev_stamina = state.get('_prev_stamina', state.get('stamina', 80))
-    state['title'] = calculate_title(state['attributes'])
-    new_ach, unlocked = check_achievements(state, prev_stamina)
-    state['unlocked_achievements'] = list(unlocked)
-    state['_prev_stamina'] = state['stamina']
-    milestone_done, milestone_reward = check_milestone(state)
-    npc_event = generate_npc_event(state)
-    stamina_status, _ = get_stamina_status(state['stamina'])
+    # Mark interaction
+    interacted[npc_id] = True
+    state['_npc_interacted'] = interacted
 
     save_state(state)
     return jsonify({
-        'ok': True, 'entry': entry,
-        'attributes': state['attributes'], 'stamina': state['stamina'],
-        'savings': state['savings'], 'title': state['title'],
-        'npcs': state['npcs'], 'company': state.get('company', {}),
-        'career_history': state.get('career_history', []),
-        'unlocked_achievements': list(unlocked),
-        'new_achievements': [a for a in ACHIEVEMENTS if a['id'] in new_ach],
-        'milestone': state.get('milestone'),
-        'milestone_done': milestone_done, 'milestone_reward': milestone_reward,
-        'economy_event': economy_event, 'crisis_event': crisis_event,
-        'arc_msg': arc_msg, 'project_phase_hint': project_phase_hint,
-        'challenge': challenge, 'npc_event': npc_event,
-        'stamina_status': stamina_status, 'trait': state.get('trait'),
-        'turn': turn, 'effect': effect
+        'ok': True,
+        'npc_name': npc['name'],
+        'action_text': action['text'],
+        'effect': effect,
+        'stamina': state['stamina'],
+        'attributes': state['attributes'],
+        'npcs': state['npcs'],
     })
 
 @app.route('/api/npc/options', methods=['POST'])

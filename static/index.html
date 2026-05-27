@@ -1891,12 +1891,16 @@ async function doNPCInteraction(npcId, actionId) {
       body: JSON.stringify({npc_id: npcId, action_id: actionId})
     });
     const d = await r.json();
-    if (!d.ok) { alert(d.error); return; }
-    gameState = d.state;
-    closeSaves();
+    if (!d.ok) { showNotification('expense', d.error || '互动失败'); return; }
+
+    // Apply effects — no turn advance, no new choices
+    if (d.attributes) gameState.attributes = d.attributes;
+    if (d.stamina !== undefined) gameState.stamina = d.stamina;
+    if (d.npcs) gameState.npcs = d.npcs;
+
+    showNotification('npc', `💬 ${d.npc_name}：${d.effect}`);
     renderAll();
-    showNotification('milestone', d.result + (d.effect !== '无变化' ? ` (${d.effect})` : ''));
-  } catch (e) { alert('互动失败: ' + e.message); }
+  } catch (e) { showNotification('expense', '互动失败: ' + e.message); }
 }
 
 // ============= PORTFOLIO TAB =============
