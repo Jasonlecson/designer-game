@@ -962,6 +962,10 @@ body {
       <div class="player-origin" id="sb-origin">设计专业应届生</div>
       <div class="player-meta">
         <div class="player-meta-item">
+          <div class="player-meta-val" id="sb-title" style="font-size:0.75rem;color:var(--accent-light)">见习设计师</div>
+          <div class="player-meta-label">头衔</div>
+        </div>
+        <div class="player-meta-item">
           <div class="player-meta-val" id="sb-turn">1</div>
           <div class="player-meta-label">回合</div>
         </div>
@@ -1301,6 +1305,8 @@ function renderAll() {
   document.getElementById('sb-avatar').textContent = (player.name || '林')[0];
   document.getElementById('sb-name').textContent = player.name || '—';
   document.getElementById('sb-origin').textContent = player.origin || '—';
+  const title = gameState.title || { title: '见习设计师', stage: '萌芽期' };
+  document.getElementById('sb-title').textContent = title.title;
   document.getElementById('sb-turn').textContent = gameState.turn_count;
   document.getElementById('sb-credit').textContent = attrs['行业信用'] || 5;
   document.getElementById('sb-portfolio').textContent = attrs['作品集厚度'] || 1;
@@ -1535,6 +1541,35 @@ function renderPortfolio() {
 
   const log = gameState.story_log || [];
   const projects = log.filter(e => e.event_tag === '项目推进');
+
+  // Achievements section
+  const unlockedAch = gameState.unlocked_achievements || [];
+  html += `<div style="margin:20px 0"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:12px">🏅 成就 (${unlockedAch.length}/12)</div>`;
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+
+  const ACHIEVEMENTS = [
+    {id:'first_project',name:'初出茅庐',desc:'完成第一个项目',icon:'🌱'},
+    {id:'portfolio_5',name:'作品等身',desc:'作品集厚度达到5',icon:'📦'},
+    {id:'portfolio_8',name:'业界标杆',desc:'作品集厚度达到8',icon:'🏆'},
+    {id:'credit_7',name:'金字招牌',desc:'行业信用达到7',icon:'🤝'},
+    {id:'credit_9',name:'德高望重',desc:'行业信用达到9',icon:'👑'},
+    {id:'aesthetic_8',name:'审美大师',desc:'审美判断力达到8',icon:'🎨'},
+    {id:'stress_low',name:'至暗时刻',desc:'抗压阈值降到2以下',icon:'🌑'},
+    {id:'stress_recover',name:'涅槃重生',desc:'从低谷恢复',icon:'🔥'},
+    {id:'npc_3_related',name:'社交达人',desc:'3位NPC建立关系',icon:'💬'},
+    {id:'turn_20',name:'十年磨一剑',desc:'20回合',icon:'⏳'},
+    {id:'turn_50',name:'老设计师',desc:'50回合',icon:'📜'},
+    {id:'all_rounder',name:'六边形战士',desc:'全属性≥6',icon:'⭐'},
+  ];
+  ACHIEVEMENTS.forEach(a => {
+    const unlocked = unlockedAch.includes(a.id);
+    html += `<div style="padding:8px 10px;border-radius:var(--radius-sm);font-size:0.75rem;${unlocked?'background:var(--accent-bg);border:1px solid var(--accent-light)':'background:var(--surface-1);border:1px solid var(--surface-2);opacity:0.45'}">
+      <span>${a.icon}</span> <span style="font-weight:600">${a.name}</span>
+      <div style="font-size:0.65rem;color:var(--text-secondary)">${unlocked?'已解锁':'未解锁'} · ${a.desc}</div>
+    </div>`;
+  });
+  html += `</div></div>`;
+
   if (projects.length > 0) {
     html += `<div style="margin-top:16px"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:10px">已完成项目</div>`;
     projects.forEach(e => {
@@ -1579,6 +1614,10 @@ async function makeChoice(choiceId) {
     }
     if (d.entry) gameState.story_log.push(d.entry);
     if (d.attributes) gameState.attributes = d.attributes;
+    if (d.title) gameState.title = d.title;
+    if (d.new_achievements && d.new_achievements.length > 0) {
+      gameState.new_achievements = d.new_achievements;
+    }
     if (d.turn) gameState.turn_count = d.turn;
   } catch (e) {
     if (choicesEl) choicesEl.innerHTML = `<div style="color:var(--danger);padding:8px">${e.name === 'AbortError' ? '超时' : '失败: ' + esc(e.message)}</div>`;

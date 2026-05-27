@@ -212,8 +212,87 @@ def apply_npc_updates(npcs, npc_updates):
     return npcs
 
 # ============================================================
-# Build Messages
+# Career Title / Stage System
 # ============================================================
+TITLE_THRESHOLDS = [
+    # (title, stage_name, conditions)
+    # conditions: {attr_name: min_value, ...} — all must be met
+    {'title': '见习设计师',     'stage': '萌芽期', 'attrs': {}},
+    {'title': '初级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 3, '执行力': 3}},
+    {'title': '中级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 5, '执行力': 5, '作品集厚度': 3}},
+    {'title': '高级设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 7, '执行力': 6, '作品集厚度': 5, '行业信用': 5}},
+    {'title': '资深设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 7, '执行力': 7, '作品集厚度': 7, '行业信用': 6, '商业理解力': 5}},
+    {'title': '设计总监',       'stage': '巅峰期', 'attrs': {'审美判断力': 8, '执行力': 7, '作品集厚度': 8, '行业信用': 7, '商业理解力': 7, '表达与说服力': 7}},
+    {'title': '创意合伙人',     'stage': '巅峰期', 'attrs': {'审美判断力': 9, '执行力': 8, '作品集厚度': 9, '行业信用': 8, '商业理解力': 8, '表达与说服力': 8, '自主判断力': 8}},
+    {'title': '独立设计大师',   'stage': '传奇',   'attrs': {'审美判断力': 9, '作品集厚度': 10, '行业信用': 9, '自主判断力': 9}},
+]
+
+ACHIEVEMENTS = [
+    {'id': 'first_project',  'name': '初出茅庐', 'desc': '完成第一个设计项目', 'icon': '🌱'},
+    {'id': 'portfolio_5',    'name': '作品等身', 'desc': '作品集厚度达到 5',  'icon': '📦'},
+    {'id': 'portfolio_8',    'name': '业界标杆', 'desc': '作品集厚度达到 8',  'icon': '🏆'},
+    {'id': 'credit_7',       'name': '金字招牌', 'desc': '行业信用达到 7',    'icon': '🤝'},
+    {'id': 'credit_9',       'name': '德高望重', 'desc': '行业信用达到 9',    'icon': '👑'},
+    {'id': 'aesthetic_8',    'name': '审美大师', 'desc': '审美判断力达到 8',  'icon': '🎨'},
+    {'id': 'stress_low',     'name': '至暗时刻', 'desc': '抗压阈值降到 2 以下','icon': '🌑'},
+    {'id': 'stress_recover', 'name': '涅槃重生', 'desc': '抗压阈值从低谷恢复到 6 以上', 'icon': '🔥'},
+    {'id': 'npc_3_related',  'name': '社交达人', 'desc': '与 3 位以上 NPC 建立非默认关系', 'icon': '💬'},
+    {'id': 'turn_20',        'name': '十年磨一剑', 'desc': '职业生涯超过 20 回合', 'icon': '⏳'},
+    {'id': 'turn_50',        'name': '老设计师',   'desc': '职业生涯超过 50 回合', 'icon': '📜'},
+    {'id': 'all_rounder',    'name': '六边形战士', 'desc': '所有属性达到 6 以上', 'icon': '⭐'},
+]
+
+def calculate_title(attrs):
+    '''Determine current career title based on highest threshold met.'''
+    current = TITLE_THRESHOLDS[0]
+    for t in TITLE_THRESHOLDS:
+        meets = all(attrs.get(k, 0) >= v for k, v in t['attrs'].items())
+        if meets:
+            current = t
+    return current
+
+def check_achievements(state, prev_attrs=None):
+    '''Check and unlock new achievements. Returns list of newly unlocked.'''
+    attrs = state.get('attributes', {})
+    npcs = state.get('npcs', [])
+    turn = state.get('turn_count', 0)
+    unlocked = set(state.get('unlocked_achievements', []))
+    new_unlocks = []
+
+    def unlock(ach_id):
+        if ach_id not in unlocked:
+            unlocked.add(ach_id)
+            new_unlocks.append(ach_id)
+
+    # Attribute-based
+    if attrs.get('作品集厚度', 0) >= 5: unlock('portfolio_5')
+    if attrs.get('作品集厚度', 0) >= 8: unlock('portfolio_8')
+    if attrs.get('行业信用', 0) >= 7: unlock('credit_7')
+    if attrs.get('行业信用', 0) >= 9: unlock('credit_9')
+    if attrs.get('审美判断力', 0) >= 8: unlock('aesthetic_8')
+
+    # Stress lows
+    if attrs.get('抗压阈值', 0) <= 2: unlock('stress_low')
+    if prev_attrs and prev_attrs.get('抗压阈值', 5) <= 2 and attrs.get('抗压阈值', 5) >= 6:
+        unlock('stress_recover')
+
+    # NPC relationships
+    related_count = sum(1 for n in npcs if n.get('relation', '待剧情展开') != '待剧情展开')
+    if related_count >= 3: unlock('npc_3_related')
+
+    # Turn milestones
+    if turn >= 20: unlock('turn_20')
+    if turn >= 50: unlock('turn_50')
+
+    # All-rounder
+    all_attrs = ['审美判断力', '执行力', '商业理解力', '表达与说服力', '行业信用', '自主判断力', '作品集厚度', '抗压阈值']
+    if all(attrs.get(k, 0) >= 6 for k in all_attrs): unlock('all_rounder')
+
+    # First project — check if any log entry has event_tag '项目推进'
+    if any(e.get('event_tag') == '项目推进' for e in state.get('story_log', [])):
+        unlock('first_project')
+
+    return new_unlocks, unlocked
 def build_messages(state, player_action=None):
     player = state.get('player', {})
     attrs = state.get('attributes', {})
@@ -224,6 +303,7 @@ def build_messages(state, player_action=None):
         '# 游戏状态',
         f'女主: {player.get("name","?")}, {player.get("age","?")}岁, {player.get("city","上海")}',
         f'职业: {player.get("origin","?")} → 目标: {player.get("goal","?")}',
+        f'当前头衔: {state.get("title",{}).get("title","见习设计师")}（{state.get("title",{}).get("stage","萌芽期")}）',
         f'资源: {player.get("resources","?")}, 节奏: {player.get("pace","标准")}',
         f'当前回合: 第{story_len+1}回合',
         '',
@@ -377,6 +457,9 @@ def api_new_game():
     })
     state['attributes'] = result['attr_display']
     state['turn_count'] = 1
+    state['title'] = calculate_title(state['attributes'])
+    state['unlocked_achievements'] = []
+    check_achievements(state)
     save_state(state)
     return jsonify({'ok': True, 'state': state})
 
@@ -428,11 +511,20 @@ def api_action():
     state['attributes'] = result['attr_display']
     state['turn_count'] = turn
 
+    # Title & achievements
+    prev_attrs = state.get('_prev_attrs', state['attributes'])
+    state['title'] = calculate_title(state['attributes'])
+    new_ach, unlocked = check_achievements(state, prev_attrs)
+    state['unlocked_achievements'] = list(unlocked)
+    state['_prev_attrs'] = dict(state['attributes'])  # save for next round's comparison
+
     save_state(state)
     return jsonify({
         'ok': True,
         'entry': entry,
         'attributes': state['attributes'],
+        'title': state['title'],
+        'new_achievements': [a for a in ACHIEVEMENTS if a['id'] in new_ach],
         'turn': turn
     })
 
