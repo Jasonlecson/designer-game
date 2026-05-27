@@ -1435,14 +1435,8 @@ function renderDashboard() {
       </button>`;
     });
     choicesEl.innerHTML = chHtml;
-    // Bind click via delegation
-    choicesEl.onclick = function(e) {
-      const btn = e.target.closest('.choice-btn');
-      if (btn && !btn.disabled) makeChoice(btn.dataset.choice);
-    };
   } else {
     choicesEl.innerHTML = '';
-    choicesEl.onclick = null;
   }
 
   // Mobile attributes
@@ -1761,6 +1755,15 @@ function formatNarrative(text) {
 
 // Init
 switchScreen('cover-screen');
+
+// Global event delegation for choice buttons (always works regardless of re-renders)
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('#event-choices .choice-btn');
+  if (btn && !btn.disabled && !isProcessing) {
+    const choiceId = btn.getAttribute('data-choice');
+    if (choiceId) makeChoice(choiceId);
+  }
+});
 </script>
 </body>
 </html>
