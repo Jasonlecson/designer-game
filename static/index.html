@@ -833,13 +833,14 @@ body {
    S4: Toast Notifications
    ============================================================ */
 .notification {
-  position: fixed; top: 24px; right: 24px; z-index: 9999;
-  padding: 14px 20px; border-radius: var(--radius);
-  font-size: 0.82rem; font-weight: 600; max-width: 360px;
+  position: fixed; top: 16px; right: 16px; z-index: 9999;
+  padding: 10px 14px; border-radius: var(--radius);
+  font-size: 0.78rem; font-weight: 600; max-width: 300px;
   box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08);
-  animation: slideIn 0.4s var(--ease-spring);
-  display: flex; align-items: center; gap: 8px; line-height: 1.4;
+  animation: slideIn 0.3s var(--ease-spring);
+  display: flex; align-items: center; gap: 6px; line-height: 1.3;
 }
+.notification .notif-text { flex: 1; min-width: 0; word-break: break-all; }
 .notification-achievement { background: linear-gradient(135deg, #fdf5e6, #fef3c7); border: 1px solid var(--accent-light); color: #92400e; }
 .notification-promotion { background: linear-gradient(135deg, #edf5ee, #e8f5e9); border: 1px solid var(--success); color: #2d5a3d; }
 .notification-milestone { background: linear-gradient(135deg, #e8f0fe, #dbeafe); border: 1px solid #6b8fa1; color: #1e3a5f; }
@@ -1038,12 +1039,14 @@ body {
    COMPREHENSIVE MOBILE OPTIMIZATION
    ============================================================ */
 @media (max-width: 860px) {
-  /* Notifications: full-width from top */
+  /* Notifications: compact on mobile */
   .notification {
-    left: 12px; right: 12px; max-width: none;
+    left: 8px; right: 8px; max-width: none;
     top: auto; bottom: 12px;
-    font-size: 0.78rem; padding: 12px 16px;
+    font-size: 0.72rem; padding: 8px 12px;
+    line-height: 1.3;
   }
+  .notif-icon { font-size: 0.9rem; }
 
   /* Modal dialogs */
   .modal { padding: 16px; margin: 12px; width: auto; }
@@ -2062,30 +2065,55 @@ function showNotification(type, message) {
   const banner = document.createElement('div');
   const icons = { achievement: '🏅', promotion: '⬆️', milestone: '🎯', expense: '💸', npc: '📨' };
   banner.className = `notification notification-${type}`;
-  banner.innerHTML = `<span class="notif-icon">${icons[type] || '📢'}</span>${message}`;
+  banner.innerHTML = `<span class="notif-icon">${icons[type] || '📢'}</span><span class="notif-text">${message}</span>`;
   document.body.appendChild(banner);
 
-  // Stack notifications vertically
+  const isMobile = window.innerWidth <= 860;
   const existing = document.querySelectorAll('.notification');
-  const gap = 8;
-  const h = banner.offsetHeight || 50;
-  const idx = existing.length - 1;
-  banner.style.top = (24 + idx * (h + gap)) + 'px';
+  const gap = 6;
+  const h = banner.offsetHeight || 40;
+  
+  if (isMobile) {
+    // Mobile: stack from bottom
+    let bottomOffset = 12;
+    existing.forEach(n => { bottomOffset += (n.offsetHeight || 40) + gap; });
+    banner.style.bottom = bottomOffset + 'px';
+    banner.style.top = 'auto';
+  } else {
+    // Desktop: stack from top
+    const idx = existing.length - 1;
+    banner.style.top = (16 + idx * (h + gap)) + 'px';
+  }
 
-  // Remove after 3s and re-stack remaining
+  // Remove after 3s
   setTimeout(() => {
-    banner.style.animation = 'slideOut 0.4s ease forwards';
+    banner.style.animation = 'slideOut 0.3s ease forwards';
     setTimeout(() => {
       banner.remove();
-      // Re-stack remaining notifications
-      const remaining = document.querySelectorAll('.notification');
-      remaining.forEach((n, i) => {
-        const nh = n.offsetHeight || 50;
-        n.style.top = (24 + i * (nh + gap)) + 'px';
-        n.style.transition = 'top 0.3s ease';
-      });
-    }, 400);
-  }, 3000);
+      restackNotifications();
+    }, 300);
+  }, 2500);
+}
+
+function restackNotifications() {
+  const isMobile = window.innerWidth <= 860;
+  const remaining = document.querySelectorAll('.notification');
+  const gap = 6;
+  
+  if (isMobile) {
+    let bottomOffset = 12;
+    remaining.forEach(n => {
+      n.style.bottom = bottomOffset + 'px';
+      n.style.top = 'auto';
+      n.style.transition = 'bottom 0.2s ease';
+      bottomOffset += (n.offsetHeight || 40) + gap;
+    });
+  } else {
+    remaining.forEach((n, i) => {
+      n.style.top = (16 + i * ((n.offsetHeight || 40) + gap)) + 'px';
+      n.style.transition = 'top 0.2s ease';
+    });
+  }
 }
 
 // ============= S1: MILESTONE =============
