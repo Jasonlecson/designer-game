@@ -1787,10 +1787,10 @@ function renderNPCPanel() {
     return;
   }
   let html = '';
-  npcs.slice(0, 4).forEach((n, i) => {
-    html += `<div class="npc-panel-card">
+  npcs.slice(0, 6).forEach((n, i) => {
+    html += `<div class="npc-panel-card" onclick="showNPCInteraction('${n.id}')" style="cursor:pointer">
       <div class="npc-panel-avatar" style="background:${avatarColors[i]}">${n.name[0]}</div>
-      <div class="npc-panel-name">${esc(n.name)}</div>
+      <div class="npc-panel-name">${esc(n.name)} <span style="font-size:0.6rem;color:var(--accent-light)">›</span></div>
       <div class="npc-panel-role">${esc(n.role)}</div>
       <div class="npc-panel-rel">${esc(n.relation || '待展开')}</div>
     </div>`;
