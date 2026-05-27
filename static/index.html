@@ -40,6 +40,8 @@
 
   /* Layout */
   --sidebar-w: 260px;
+  --sidebar-min: 200px;
+  --sidebar-max: 420px;
   --radius-sm: 4px;
   --radius: 8px;
   --radius-lg: 14px;
@@ -344,8 +346,18 @@ body {
   margin-top: 12px;
 }
 .player-meta-item { text-align: center; }
-.player-meta-val { font-size: 0.9rem; font-weight: 700; color: var(--accent-light); }
-.player-meta-label { font-size: 0.65rem; color: var(--text-sidebar-dim); }
+.player-meta-val { font-size: 0.9rem; font-weight: 700; color: var(--accent-light); white-space: nowrap; }
+.player-meta-label { font-size: 0.65rem; color: var(--text-sidebar-dim); white-space: nowrap; }
+
+/* Sidebar resize handle */
+#sidebar-resizer {
+  position: absolute; right: 0; top: 0; bottom: 0;
+  width: 6px; cursor: col-resize; z-index: 10;
+  background: transparent; transition: background 0.15s;
+}
+#sidebar-resizer:hover,
+#sidebar-resizer.dragging { background: rgba(255,255,255,0.06); }
+#sidebar { position: relative; }
 
 /* Attributes */
 .attr-list { display: flex; flex-direction: column; gap: 10px; }
@@ -570,6 +582,16 @@ body {
 .choice-btn .ch-effect {
   font-size: 0.68rem; color: var(--accent); margin-top: 6px;
   font-weight: 600; letter-spacing: 0.02em;
+}
+.choice-btn-auto {
+  border-style: dashed !important;
+  border-color: var(--surface-3) !important;
+  background: var(--surface-card) !important;
+  margin-top: 4px;
+}
+.choice-btn-auto:hover:not(:disabled) {
+  border-color: var(--accent-light) !important;
+  background: var(--accent-bg) !important;
 }
 .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
@@ -804,6 +826,97 @@ body {
 .modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 20px; }
 
 /* ============================================================
+   S4: Toast Notifications
+   ============================================================ */
+.notification {
+  position: fixed; top: 24px; right: 24px; z-index: 9999;
+  padding: 14px 20px; border-radius: var(--radius);
+  font-size: 0.82rem; font-weight: 600; max-width: 360px;
+  box-shadow: 0 4px 20px rgba(0,0,0,0.12), 0 1px 3px rgba(0,0,0,0.08);
+  animation: slideIn 0.4s var(--ease-spring);
+  display: flex; align-items: center; gap: 8px; line-height: 1.4;
+}
+.notification-achievement { background: linear-gradient(135deg, #fdf5e6, #fef3c7); border: 1px solid var(--accent-light); color: #92400e; }
+.notification-promotion { background: linear-gradient(135deg, #edf5ee, #e8f5e9); border: 1px solid var(--success); color: #2d5a3d; }
+.notification-milestone { background: linear-gradient(135deg, #e8f0fe, #dbeafe); border: 1px solid #6b8fa1; color: #1e3a5f; }
+.notification-expense { background: linear-gradient(135deg, #fdf0ed, #fee2e2); border: 1px solid var(--danger); color: #712c2c; }
+.notification-npc { background: linear-gradient(135deg, #f3e8ff, #ede9fe); border: 1px solid #9370db; color: #4a2d6e; }
+.notif-icon { font-size: 1.1rem; flex-shrink: 0; }
+
+@keyframes slideIn { from { transform: translateX(120%); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+@keyframes slideOut { from { transform: translateX(0); opacity: 1; } to { transform: translateX(120%); opacity: 0; } }
+
+/* ============================================================
+   S1: Milestone Bar
+   ============================================================ */
+.milestone-bar {
+  margin: 8px 0; padding: 10px 12px; border-radius: var(--radius);
+  background: var(--surface-1); border: 1px solid var(--surface-2);
+}
+.milestone-bar .ms-header {
+  display: flex; justify-content: space-between; align-items: center;
+  font-size: 0.72rem; margin-bottom: 6px;
+}
+.milestone-bar .ms-title { font-weight: 700; color: var(--text-primary); }
+.milestone-bar .ms-deadline { color: var(--text-tertiary); }
+.milestone-bar .ms-progress {
+  height: 6px; border-radius: 3px; background: var(--surface-2); overflow: hidden;
+}
+.milestone-bar .ms-progress-fill {
+  height: 100%; border-radius: 3px; background: var(--accent-light);
+  transition: width 0.6s var(--ease-out);
+}
+.milestone-bar .ms-reward {
+  font-size: 0.68rem; color: var(--text-secondary); margin-top: 4px;
+}
+
+/* ============================================================
+   S2: Stamina Status
+   ============================================================ */
+.stamina-status {
+  font-size: 0.68rem; padding: 2px 6px; border-radius: 3px;
+  margin-left: 4px; font-weight: 600;
+  white-space: nowrap; display: inline-block;
+}
+.stamina-status-vigorous { background: #edf5ee; color: var(--success); }
+.stamina-status-normal { background: var(--accent-bg); color: var(--accent); }
+.stamina-status-fatigued { background: #fdf8e8; color: var(--warning); }
+.stamina-status-exhausted { background: #fde8e8; color: #d4846a; }
+.stamina-status-critical { background: var(--danger-bg); color: var(--danger); }
+
+/* Sidebar dark background overrides */
+#sidebar .stamina-status { background: transparent; }
+#sidebar .stamina-status-vigorous { color: #6b8f71; }
+#sidebar .stamina-status-normal { color: var(--accent-light); }
+#sidebar .stamina-status-fatigued { color: var(--warning); }
+#sidebar .stamina-status-exhausted { color: #e88b7a; }
+#sidebar .stamina-status-critical { color: var(--danger); }
+
+/* ============================================================
+   I4: Active Actions
+   ============================================================ */
+.active-actions {
+  margin-top: 16px; padding-top: 12px;
+  border-top: 1px dashed var(--surface-3);
+}
+.active-actions .aa-label {
+  font-size: 0.72rem; color: var(--text-tertiary); margin-bottom: 8px;
+  font-weight: 600; text-transform: uppercase; letter-spacing: 0.04em;
+}
+.active-actions .aa-row {
+  display: flex; gap: 8px; flex-wrap: wrap;
+}
+.aa-btn {
+  padding: 8px 14px; border: 1px solid var(--surface-3); border-radius: 20px;
+  background: var(--surface-card); cursor: pointer; font-size: 0.78rem;
+  font-weight: 500; color: var(--text-secondary);
+  transition: all 0.15s var(--ease-out);
+  white-space: nowrap;
+}
+.aa-btn:hover { border-color: var(--accent-light); color: var(--accent); background: var(--accent-bg); }
+.aa-btn:disabled { opacity: 0.4; cursor: not-allowed; filter: grayscale(0.5); }
+
+/* ============================================================
    RESPONSIVE
    ============================================================ */
 @media (max-width: 860px) {
@@ -813,6 +926,7 @@ body {
 
   /* Sidebar hidden, no menu toggle needed since config is in topbar */
   #sidebar { display: none; }
+  #sidebar-resizer { display: none; }
   .mobile-attrs { display: block; }
 
   /* Cover adjustments */
@@ -964,6 +1078,7 @@ body {
 <div class="screen" id="game-screen">
   <!-- Sidebar -->
   <div id="sidebar">
+    <div id="sidebar-resizer"></div>
     <div class="player-card">
       <div class="player-avatar" id="sb-avatar">林</div>
       <div class="player-name" id="sb-name">林知夏</div>
@@ -1002,6 +1117,11 @@ body {
       <div class="attr-list" id="sb-attrs"></div>
     </div>
 
+    <div class="side-section" id="sb-milestone-section" style="display:none">
+      <div style="font-size:0.72rem;font-weight:600;color:var(--text-sidebar-dim);letter-spacing:0.06em;margin-bottom:8px">🎯 阶段目标</div>
+      <div class="milestone-bar" id="sb-milestone"></div>
+    </div>
+
     <div class="side-section">
       <div style="font-size:0.72rem;font-weight:600;color:var(--text-sidebar-dim);letter-spacing:0.06em;margin-bottom:12px">人脉网络</div>
       <div class="npc-list" id="sb-npcs"></div>
@@ -1009,7 +1129,9 @@ body {
 
     <div class="side-footer">
       <button class="btn-ghost" onclick="showConfig()">⚙ 配置</button>
-      <button class="btn-ghost" onclick="resetGame()" style="margin-top:4px">结束游戏</button>
+      <button class="btn-ghost" style="margin-top:4px" onclick="exportSave()">💾 导出存档</button>
+      <button class="btn-ghost" style="margin-top:4px" onclick="showSaves()">📂 存档管理</button>
+      <button class="btn-ghost" style="margin-top:4px" onclick="confirmReset()">结束游戏</button>
     </div>
   </div>
 
@@ -1042,12 +1164,20 @@ body {
             </div>
             <div class="panel-body" id="event-narrative"></div>
             <div class="event-choices" id="event-choices"></div>
+            <div class="active-actions" id="active-actions" style="display:none;padding:8px 16px 16px">
+              <div class="aa-label">⚡ 主动行动（不消耗 AI）</div>
+              <div class="aa-row" id="aa-buttons"></div>
+            </div>
           </div>
           <div class="panel mobile-attrs">
             <div class="panel-header">
               <span class="panel-title">📊 能力属性</span>
             </div>
             <div class="panel-body" style="padding:12px 16px">
+              <div style="display:flex;gap:12px;margin-bottom:12px;font-size:0.75rem">
+                <span>⚡ 精力: <b id="mobile-stamina" style="color:var(--accent)">80</b>/100</span>
+                <span>💰 储蓄: <b id="mobile-savings" style="color:var(--accent)">3k</b></span>
+              </div>
               <div id="mobile-attrs" style="display:grid;grid-template-columns:1fr 1fr;gap:8px"></div>
             </div>
           </div>
@@ -1309,15 +1439,26 @@ async function loadGame() {
     const d = await r.json();
     if (!d.state) { alert('没有存档'); return; }
     gameState = d.state;
+    gameState._prev_title = (d.state.title && d.state.title.title) || '';
     showGame();
     renderAll();
   } catch (e) { alert('连接失败'); }
+}
+
+function confirmReset() {
+  if (confirm('确定要结束当前游戏吗？\n\n存档将被删除，此操作不可撤销。')) {
+    resetGame();
+  }
 }
 
 async function resetGame() {
   try { await fetch('/api/reset', { method: 'POST' }); } catch (e) {}
   gameState = null;
   switchScreen('cover-screen');
+}
+
+async function exportSave() {
+  window.open('/api/export', '_blank');
 }
 
 // ============= RENDER ALL =============
@@ -1340,10 +1481,17 @@ function renderAll() {
   document.getElementById('sb-stamina').textContent = gameState.stamina || 80;
   const sav = gameState.savings || 3000;
   document.getElementById('sb-savings').textContent = sav >= 10000 ? (sav/10000).toFixed(1)+'w' : (sav/1000).toFixed(0)+'k';
+  // Show monthly salary as title tooltip on the savings item
+    const titles = { '见习设计师': 3500, '初级设计师': 5000, '中级设计师': 8000,
+      '高级设计师': 12000, '资深设计师': 18000, '设计总监': 25000,
+      '创意合伙人': 35000, '独立设计大师': 50000 };
+    const t = (gameState.title && gameState.title.title) || '见习设计师';
+    const salary = titles[t] || 4000;
+    document.getElementById('sb-savings').title = `月薪 ${salary/1000}k  |  固定开销 ~2.5k/月`;
 
   // Topbar
   document.getElementById('tb-location').textContent = player.city || '上海';
-  document.getElementById('tb-turn').textContent = `第 ${gameState.turn_count} 回合`;
+  document.getElementById('tb-turn').textContent = formatGameDate(gameState.turn_count);
 
   // Update topbar tag
   const log = gameState.story_log || [];
@@ -1360,6 +1508,20 @@ function renderAll() {
   renderAttrs(attrs);
   // Mobile attributes
   renderMobileAttrs(attrs);
+  // S2: Stamina status
+  const staminaEl = document.getElementById('sb-stamina');
+  const statusText = gameState.stamina_status || '正常';
+  staminaEl.parentElement.innerHTML = `<div class="player-meta-val" id="sb-stamina">${gameState.stamina || 80}<span class="stamina-status stamina-status-${getStaminaClass(statusText)}">${statusText}</span></div><div class="player-meta-label">精力</div>`;
+  // I5d: Mobile stamina/savings
+  const msEl = document.getElementById('mobile-stamina');
+  if (msEl) msEl.textContent = gameState.stamina || 80;
+  const msSav = document.getElementById('mobile-savings');
+  if (msSav) {
+    const sav = gameState.savings || 3000;
+    msSav.textContent = sav >= 10000 ? (sav/10000).toFixed(1)+'w' : (sav/1000).toFixed(0)+'k';
+  }
+  // S1: Milestone
+  renderMilestone();
   // Sidebar NPCs
   renderSidebarNPCs(gameState.npcs || []);
 
@@ -1434,6 +1596,13 @@ function renderDashboard() {
         ${ch.effect ? `<div class="ch-effect">${esc(ch.effect)}</div>` : ''}
       </button>`;
     });
+    // Append "自主行动" as an additional choice in the list
+    chHtml += `<button class="choice-btn choice-btn-auto" data-choice="__action__" ${isProcessing?'disabled':''} onclick="event.stopPropagation();toggleActiveSubmenu()">
+      <div class="ch-letter">⭐</div>
+      <div class="ch-text">这个月我想做点别的...</div>
+      <div class="ch-hint">休息 / 学习 / 社交 / 求职</div>
+    </button>
+    <div id="active-submenu" style="display:none">${buildActiveActionButtons()}</div>`;
     choicesEl.innerHTML = chHtml;
   } else {
     choicesEl.innerHTML = '';
@@ -1441,6 +1610,50 @@ function renderDashboard() {
 
   // Mobile attributes
   renderMobileAttrs(gameState.attributes);
+  // I4-P1: Active actions
+  renderActiveActions();
+}
+
+function renderActiveActions() {
+  const el = document.getElementById('active-actions');
+  if (!el) return;
+  // Active actions are now inline with choices — hide this panel entirely
+  el.style.display = 'none';
+}
+
+function buildActiveActionButtons() {
+  const actions = [
+    { key: 'rest_short', name: '☕ 周末休整', desc: '+15精力', disabled: gameState.stamina >= 95 },
+    { key: 'rest_long', name: '🏖️ 请假休假', desc: '+35精力, -1k', disabled: gameState.stamina >= 80 || (gameState.savings||0) < 1000 },
+    { key: 'portfolio', name: '🎨 整理作品集', desc: '作品+1, -5精力', disabled: (gameState.attributes['作品集厚度'] || 0) >= 10 },
+    { key: 'train', name: '📚 报班学习', desc: '选属性+1, -3k', disabled: (gameState.savings || 0) < 3000 },
+    { key: 'train_intensive', name: '🎓 封闭集训', desc: '属性+2, -8k -20精力', disabled: (gameState.savings || 0) < 8000 || gameState.stamina < 30 },
+    { key: 'jobhunt_targeted', name: '🎯 精准投递', desc: '-15精力, 投3家公司', disabled: gameState.stamina < 20 },
+    { key: 'networking', name: '🤝 社交拓展', desc: '-1.5k -8精力', disabled: (gameState.savings || 0) < 1500 || gameState.stamina < 15 },
+  ];
+  let html = '<div style="padding:8px 0"><div style="font-size:0.72rem;color:var(--text-tertiary);margin-bottom:8px;text-align:center">选择一项自主行动：</div><div style="display:flex;flex-wrap:wrap;gap:6px;justify-content:center">';
+  actions.forEach(a => {
+    html += `<button class="aa-btn" data-aa="${a.key}" ${a.disabled || isProcessing ? 'disabled' : ''} title="${a.desc}">
+      ${a.name} <span style="font-size:0.68rem;opacity:0.7">${a.desc}</span>
+    </button>`;
+  });
+  html += '</div></div>';
+  return html;
+}
+
+function toggleActiveSubmenu() {
+  const sub = document.getElementById('active-submenu');
+  if (!sub) return;
+  if (sub.style.display === 'none') {
+    sub.style.display = 'block';
+  } else {
+    sub.style.display = 'none';
+  }
+}
+
+function getStaminaClass(status) {
+  const map = { '精力充沛': 'vigorous', '正常': 'normal', '疲劳': 'fatigued', '严重疲劳': 'exhausted', '透支': 'critical', '濒临崩塌': 'critical' };
+  return map[status] || 'normal';
 }
 
 function renderMobileAttrs(attrs) {
@@ -1579,44 +1792,26 @@ function renderPortfolio() {
   </div>`;
 
   html += `<div class="portfolio-stat">
-    <div class="portfolio-stat-num" style="color:var(--success)">${attrs['行业信用'] || 0}</div>
+    <div class="portfolio-stat-num" style="color:var(--accent-light)">${attrs['创意深度'] || 0}</div>
     <div>
-      <div style="font-weight:600;color:var(--text-primary)">行业信用</div>
-      <div class="portfolio-stat-label">在行业内的声誉和影响力</div>
-      <div class="attr-bar" style="margin-top:8px;background:var(--surface-2)"><div class="attr-fill" style="width:${(attrs['行业信用']||0)*10}%;background:var(--success)"></div></div>
+      <div style="font-weight:600;color:var(--text-primary)">创意深度</div>
+      <div class="portfolio-stat-label">概念思考与原创能力</div>
+      <div class="attr-bar" style="margin-top:8px;background:var(--surface-2)"><div class="attr-fill" style="width:${(attrs['创意深度']||0)*10}%;background:var(--accent-light)"></div></div>
     </div>
   </div>`;
 
   const log = gameState.story_log || [];
   const projects = log.filter(e => e.event_tag === '项目推进');
 
-  // Achievements section
+  // Achievements section - F3: use API data
   const unlockedAch = gameState.unlocked_achievements || [];
   html += `<div style="margin:20px 0"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:12px">🏅 成就 (${unlockedAch.length}/12)</div>`;
-  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">`;
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="achievements-grid"></div></div>`;
 
-  const ACHIEVEMENTS = [
-    {id:'first_project',name:'初出茅庐',desc:'完成第一个项目',icon:'🌱'},
-    {id:'portfolio_5',name:'作品等身',desc:'作品集厚度达到5',icon:'📦'},
-    {id:'portfolio_8',name:'业界标杆',desc:'作品集厚度达到8',icon:'🏆'},
-    {id:'expression_7',name:'金字招牌',desc:'表达能力达到7',icon:'🤝'},
-    {id:'expression_9',name:'德高望重',desc:'表达能力达到9',icon:'👑'},
-    {id:'aesthetic_8',name:'审美大师',desc:'审美判断力达到8',icon:'🎨'},
-    {id:'stamina_low',name:'至暗时刻',desc:'精力值降到10以下',icon:'🌑'},
-    {id:'stamina_recover',name:'涅槃重生',desc:'从低谷恢复',icon:'🔥'},
-    {id:'npc_3_related',name:'社交达人',desc:'3位NPC建立关系',icon:'💬'},
-    {id:'turn_20',name:'十年磨一剑',desc:'20回合',icon:'⏳'},
-    {id:'turn_50',name:'老设计师',desc:'50回合',icon:'📜'},
-    {id:'all_rounder',name:'六边形战士',desc:'全属性≥6',icon:'⭐'},
-  ];
-  ACHIEVEMENTS.forEach(a => {
-    const unlocked = unlockedAch.includes(a.id);
-    html += `<div style="padding:8px 10px;border-radius:var(--radius-sm);font-size:0.75rem;${unlocked?'background:var(--accent-bg);border:1px solid var(--accent-light)':'background:var(--surface-1);border:1px solid var(--surface-2);opacity:0.45'}">
-      <span>${a.icon}</span> <span style="font-weight:600">${a.name}</span>
-      <div style="font-size:0.65rem;color:var(--text-secondary)">${unlocked?'已解锁':'未解锁'} · ${a.desc}</div>
-    </div>`;
-  });
-  html += `</div></div>`;
+  container.innerHTML = html;
+  // F3: Async load achievements from API
+  loadAchievementsGrid(unlockedAch);
+
 
   // Career history
   const history = gameState.career_history || [];
@@ -1690,10 +1885,57 @@ async function makeChoice(choiceId) {
     if (d.stamina !== undefined) gameState.stamina = d.stamina;
     if (d.savings !== undefined) gameState.savings = d.savings;
     if (d.title) gameState.title = d.title;
+    if (d.npcs) gameState.npcs = d.npcs;
+    if (d.company) gameState.company = d.company;
+    if (d.career_history) gameState.career_history = d.career_history;
+    if (d.unlocked_achievements) gameState.unlocked_achievements = d.unlocked_achievements;
+    if (d.milestone) gameState.milestone = d.milestone;
+    if (d.trait) gameState.trait = d.trait;
+    if (d.stamina_status) gameState.stamina_status = d.stamina_status;
     if (d.new_achievements && d.new_achievements.length > 0) {
       gameState.new_achievements = d.new_achievements;
+      // S4: Show achievement toast
+      d.new_achievements.forEach(a => showNotification('achievement', `${a.icon} ${a.name} — ${a.desc}`));
+    }
+    // S4: Show promotion toast
+    if (d.title && d.title.title !== (gameState._prev_title || '')) {
+      showNotification('promotion', `晋升为${d.title.title}！`);
+    }
+    // S4: Show milestone toast
+    if (d.milestone_done) {
+      showNotification('milestone', d.milestone_reward ? `目标达成！奖励：${d.milestone_reward}` : '阶段目标已过期');
+    }
+    // S3: Show monthly economy event
+    if (d.economy_event) {
+      const ev = d.economy_event;
+      if (ev.salary > 0) {
+        showNotification('expense', `月结：工资+${ev.salary}元 开销-${ev.expense}元 净${ev.net >= 0 ? '+' : ''}${ev.net}元`);
+      } else {
+        showNotification('expense', `月结：暂无固定收入 开销-${ev.expense}元`);
+      }
+    }
+    // I1: Show NPC event
+    if (d.npc_event) {
+      showNotification('npc', `${d.npc_event.npc_name}：${d.npc_event.text}`);
     }
     if (d.turn) gameState.turn_count = d.turn;
+
+    // 2: Savings crisis
+    if (d.crisis_event) {
+      const level = d.crisis_event.level || 0;
+      if (d.crisis_event.type === 'recovery') {
+        showNotification('achievement', '💰 ' + d.crisis_event.message);
+      } else {
+        showNotification('expense', '⚠️ ' + d.crisis_event.message);
+      }
+    }
+    // 4: Narrative arc
+    if (d.arc_msg) showNotification('npc', '📖 ' + d.arc_msg);
+    // 6: Career challenge
+    if (d.challenge) showNotification('milestone', '🔥 ' + d.challenge.name + '：' + d.challenge.message);
+    // 3: Project phase
+    if (d.project_phase_hint) showNotification('milestone', '📋 项目进入「' + d.project_phase_hint + '」阶段');
+    gameState._prev_title = (d.title && d.title.title) || gameState._prev_title;
   } catch (e) {
     if (choicesEl) choicesEl.innerHTML = `<div style="color:var(--danger);padding:8px">${e.name === 'AbortError' ? '超时' : '失败: ' + esc(e.message)}</div>`;
   }
@@ -1701,7 +1943,240 @@ async function makeChoice(choiceId) {
   renderAll();
 }
 
-// ============= ENDING =============
+// ============= S4: TOAST NOTIFICATIONS =============
+function showNotification(type, message) {
+  const banner = document.createElement('div');
+  const icons = { achievement: '🏅', promotion: '⬆️', milestone: '🎯', expense: '💸', npc: '📨' };
+  banner.className = `notification notification-${type}`;
+  banner.innerHTML = `<span class="notif-icon">${icons[type] || '📢'}</span>${message}`;
+  document.body.appendChild(banner);
+
+  // Stack notifications vertically
+  const existing = document.querySelectorAll('.notification');
+  const gap = 8;
+  const h = banner.offsetHeight || 50;
+  const idx = existing.length - 1;
+  banner.style.top = (24 + idx * (h + gap)) + 'px';
+
+  // Remove after 3s and re-stack remaining
+  setTimeout(() => {
+    banner.style.animation = 'slideOut 0.4s ease forwards';
+    setTimeout(() => {
+      banner.remove();
+      // Re-stack remaining notifications
+      const remaining = document.querySelectorAll('.notification');
+      remaining.forEach((n, i) => {
+        const nh = n.offsetHeight || 50;
+        n.style.top = (24 + i * (nh + gap)) + 'px';
+        n.style.transition = 'top 0.3s ease';
+      });
+    }, 400);
+  }, 3000);
+}
+
+// ============= S1: MILESTONE =============
+function renderMilestone() {
+  const section = document.getElementById('sb-milestone-section');
+  const bar = document.getElementById('sb-milestone');
+  const ms = gameState.milestone;
+  if (!ms || ms.completed) {
+    if (section) section.style.display = 'none';
+    return;
+  }
+  if (section) section.style.display = 'block';
+  const deadline = ms.deadline_turn || 0;
+  const turn = gameState.turn_count || 0;
+  const progress = Math.min(100, Math.max(0, ms.progress || 0));
+  const turnsLeft = Math.max(0, deadline - turn);
+  bar.innerHTML = `
+    <div class="ms-header">
+      <span class="ms-title">${esc(ms.description || '')}</span>
+      <span class="ms-deadline">${turnsLeft} 回合剩余</span>
+    </div>
+    <div class="ms-progress"><div class="ms-progress-fill" style="width:${progress}%"></div></div>
+    ${ms.reward ? `<div class="ms-reward">🎁 ${esc(ms.reward)}</div>` : ''}
+  `;
+}
+
+// ============= F3: ACHIEVEMENTS FROM API =============
+let _allAchievements = null;
+async function fetchAchievements() {
+  if (_allAchievements) return _allAchievements;
+  try {
+    const r = await fetch('/api/achievements');
+    const d = await r.json();
+    _allAchievements = d.achievements || [];
+  } catch (e) { _allAchievements = []; }
+  return _allAchievements;
+}
+
+async function loadAchievementsGrid(unlockedAch) {
+  const grid = document.getElementById('achievements-grid');
+  if (!grid) return;
+  const all = await fetchAchievements();
+  let html = '';
+  all.forEach(a => {
+    const unlocked = unlockedAch.includes(a.id);
+    html += `<div style="padding:8px 10px;border-radius:var(--radius-sm);font-size:0.75rem;${unlocked?'background:var(--accent-bg);border:1px solid var(--accent-light)':'background:var(--surface-1);border:1px solid var(--surface-2);opacity:0.45'}">
+      <span>${a.icon}</span> <span style="font-weight:600">${a.name}</span>
+      <div style="font-size:0.65rem;color:var(--text-secondary)">${unlocked?'已解锁':'未解锁'} · ${a.desc}</div>
+    </div>`;
+  });
+  grid.innerHTML = html;
+}
+
+// ============= I4-P1: ACTIVE ACTION HANDLER =============
+async function doActiveAction(actionKey) {
+  if (isProcessing) return;
+  isProcessing = true;
+
+  const choicesEl = document.getElementById('event-choices');
+  if (choicesEl) {
+    choicesEl.innerHTML = '<div class="loading-state" style="padding:16px"><div class="loading-dots"><span></span><span></span><span></span></div><div style="font-size:0.8rem">AI 叙述中…</div></div>';
+  }
+
+  try {
+    const r = await fetch('/api/active_action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: actionKey })
+    });
+    const d = await r.json();
+    if (d.error) { alert(d.error); isProcessing = false; return; }
+
+    // Full state update — now includes LLM narrative + choices
+    if (d.entry) gameState.story_log.push(d.entry);
+    if (d.attributes) gameState.attributes = d.attributes;
+    if (d.stamina !== undefined) gameState.stamina = d.stamina;
+    if (d.savings !== undefined) gameState.savings = d.savings;
+    if (d.title) gameState.title = d.title;
+    if (d.npcs) gameState.npcs = d.npcs;
+    if (d.company) gameState.company = d.company;
+    if (d.career_history) gameState.career_history = d.career_history;
+    if (d.unlocked_achievements) gameState.unlocked_achievements = d.unlocked_achievements;
+    if (d.milestone) gameState.milestone = d.milestone;
+    if (d.trait) gameState.trait = d.trait;
+    if (d.stamina_status) gameState.stamina_status = d.stamina_status;
+    if (d.turn) gameState.turn_count = d.turn;
+
+    // All event notifications (check promotion BEFORE updating _prev_title)
+    if (d.new_achievements && d.new_achievements.length > 0) {
+      d.new_achievements.forEach(a => showNotification('achievement', `${a.icon} ${a.name} — ${a.desc}`));
+    }
+    if (d.title && d.title.title !== (gameState._prev_title || '')) {
+      showNotification('promotion', `晋升为${d.title.title}！`);
+    }
+    if (d.milestone_done) {
+      showNotification('milestone', d.milestone_reward ? `目标达成！奖励：${d.milestone_reward}` : '阶段目标已过期');
+    }
+    if (d.economy_event) {
+      const ev = d.economy_event;
+      if (ev.salary > 0) {
+        showNotification('expense', `月结：工资+${ev.salary}元 开销-${ev.expense}元 净${ev.net >= 0 ? '+' : ''}${ev.net}元`);
+      } else {
+        showNotification('expense', `月结：暂无固定收入 开销-${ev.expense}元`);
+      }
+    }
+    if (d.crisis_event) showNotification('expense', '⚠️ ' + d.crisis_event.message);
+    if (d.arc_msg) showNotification('npc', '📖 ' + d.arc_msg);
+    if (d.challenge) showNotification('milestone', '🔥 ' + d.challenge.name + '：' + d.challenge.message);
+    if (d.project_phase_hint) showNotification('milestone', '📋 ' + d.project_phase_hint);
+    if (d.npc_event) showNotification('npc', `${d.npc_event.npc_name}：${d.npc_event.text}`);
+    if (d.result) showNotification('npc', '⚡ ' + d.result);
+    gameState._prev_title = (d.title && d.title.title) || gameState._prev_title;
+  } catch (e) { alert('失败: ' + e.message); }
+  isProcessing = false;
+  renderAll();
+}
+
+// ============= I4-P2: SAVE MANAGEMENT =============
+async function showSaves() {
+  try {
+    const r = await fetch('/api/saves');
+    const d = await r.json();
+    const slots = d.slots || {};
+    let html = '<h3 style="font-family:var(--font-serif);margin-bottom:16px;font-size:1.1rem">📂 存档管理</h3>';
+    for (let i = 1; i <= 5; i++) {
+      const s = slots[String(i)];
+      html += `<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--surface-2);gap:12px">
+        <div style="min-width:0">
+          <span style="font-weight:600;font-size:0.85rem">槽位 ${i}</span>
+          ${s ? `<div style="font-size:0.72rem;color:var(--text-secondary)">${esc(s.name)} · ${esc(s.title)} · 第${s.turn}回合 · ${esc(s.city)}</div>` : '<div style="font-size:0.72rem;color:var(--text-tertiary)">空</div>'}
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button onclick="saveToSlot(${i})" style="padding:6px 12px;font-size:0.72rem;border-radius:var(--radius-sm);border:1px solid var(--surface-3);background:var(--surface-card);cursor:pointer">保存</button>
+          ${s ? `<button onclick="loadSlot(${i})" style="padding:6px 12px;font-size:0.72rem;border-radius:var(--radius-sm);border:1px solid var(--surface-3);background:var(--surface-card);cursor:pointer">读取</button>
+          <button onclick="deleteSlot(${i})" style="padding:6px 12px;font-size:0.72rem;border-radius:var(--radius-sm);border:1px solid var(--danger-bg);background:var(--surface-card);color:var(--danger);cursor:pointer">删除</button>` : ''}
+        </div>
+      </div>`;
+    }
+    html += `<button onclick="closeSaves()" style="margin-top:16px;padding:10px 20px;border:1px solid var(--surface-3);border-radius:var(--radius);background:var(--surface-card);cursor:pointer;width:100%;font-size:0.85rem">关闭</button>`;
+    showModal(html);
+  } catch (e) { alert('加载失败: ' + e.message); }
+}
+
+async function saveToSlot(slot) {
+  try {
+    const r = await fetch('/api/saves/save', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({slot}) });
+    const d = await r.json();
+    if (d.ok) { showNotification('milestone', `已保存到槽位 ${slot}`); showSaves(); }
+    else alert(d.error);
+  } catch (e) { alert('保存失败'); }
+}
+
+async function loadSlot(slot) {
+  if (!confirm(`确定读取槽位 ${slot} 的存档？当前进度将被覆盖。`)) return;
+  try {
+    const r = await fetch('/api/saves/load', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({slot}) });
+    const d = await r.json();
+    if (d.ok) {
+      gameState = d.state;
+      gameState._prev_title = (d.state.title && d.state.title.title) || '';
+      closeSaves();
+      renderAll();
+      showNotification('milestone', `已从槽位 ${slot} 读取存档`);
+    } else alert(d.error);
+  } catch (e) { alert('读取失败'); }
+}
+
+async function deleteSlot(slot) {
+  if (!confirm(`确定删除槽位 ${slot} 的存档？此操作不可撤销。`)) return;
+  try {
+    await fetch('/api/saves/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({slot}) });
+    showSaves();
+  } catch (e) { alert('删除失败'); }
+}
+
+function showModal(html) {
+  let modal = document.getElementById('saves-modal');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'saves-modal';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,0.3)';
+    modal.onclick = function(e) { if (e.target === modal) modal.remove(); };
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `<div style="background:var(--surface-card);border-radius:var(--radius-lg);padding:24px;max-width:480px;width:90%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.12)">${html}</div>`;
+  modal.style.display = 'flex';
+}
+
+function closeSaves() {
+  const modal = document.getElementById('saves-modal');
+  if (modal) modal.remove();
+}
+
+// ============= TIME / CALENDAR =============
+function formatGameDate(turnCount) {
+  if (!gameState || !gameState.start_date) return `第 ${turnCount} 回合`;
+  try {
+    const start = new Date(gameState.start_date);
+    const d = new Date(start.getTime() + turnCount * 7 * 86400000);
+    const seasons = { 3:'🌸春',4:'🌸春',5:'🌸春', 6:'☀️夏',7:'☀️夏',8:'☀️夏', 9:'🍂秋',10:'🍂秋',11:'🍂秋', 0:'❄️冬',1:'❄️冬',2:'❄️冬' };
+    const season = seasons[d.getMonth()] || '';
+    return `${d.getFullYear()}年${d.getMonth()+1}月 · 第${turnCount}周 ${season}`;
+  } catch(e) { return `第 ${turnCount} 回合`; }
+}
+
 function showEnding(ending) {
   const overlay = document.getElementById('ending-overlay');
   const card = document.getElementById('ending-card');
@@ -1756,12 +2231,70 @@ function formatNarrative(text) {
 // Init
 switchScreen('cover-screen');
 
+// Sidebar resize — desktop only
+(function() {
+  const sidebar = document.getElementById('sidebar');
+  const resizer = document.getElementById('sidebar-resizer');
+  if (!sidebar || !resizer) return;
+  let dragging = false, startX, startW;
+
+  // Restore saved width
+  const savedW = localStorage.getItem('sidebar-w');
+  if (savedW && window.innerWidth > 860) {
+    sidebar.style.width = savedW + 'px';
+    document.documentElement.style.setProperty('--sidebar-w', savedW + 'px');
+  }
+
+  function onDown(e) {
+    if (window.innerWidth <= 860) return; // no resize on mobile
+    dragging = true;
+    resizer.classList.add('dragging');
+    startX = e.touches ? e.touches[0].clientX : e.clientX;
+    startW = parseInt(getComputedStyle(sidebar).width, 10);
+    document.body.style.userSelect = 'none';
+    document.body.style.cursor = 'col-resize';
+  }
+
+  function onMove(e) {
+    if (!dragging) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    const w = Math.max(200, Math.min(420, startW + (x - startX)));
+    sidebar.style.width = w + 'px';
+    document.documentElement.style.setProperty('--sidebar-w', w + 'px');
+  }
+
+  function onUp() {
+    if (!dragging) return;
+    dragging = false;
+    resizer.classList.remove('dragging');
+    document.body.style.userSelect = '';
+    document.body.style.cursor = '';
+    const w = parseInt(getComputedStyle(sidebar).width, 10);
+    localStorage.setItem('sidebar-w', w);
+  }
+
+  resizer.addEventListener('mousedown', onDown);
+  resizer.addEventListener('touchstart', onDown, { passive: false });
+  document.addEventListener('mousemove', onMove);
+  document.addEventListener('touchmove', onMove, { passive: false });
+  document.addEventListener('mouseup', onUp);
+  document.addEventListener('touchend', onUp);
+})();
+
 // Global event delegation for choice buttons (always works regardless of re-renders)
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('#event-choices .choice-btn');
   if (btn && !btn.disabled && !isProcessing) {
     const choiceId = btn.getAttribute('data-choice');
     if (choiceId) makeChoice(choiceId);
+    return;
+  }
+  // I4-P1: Active action buttons
+  const aaBtn = e.target.closest('.aa-btn');
+  if (aaBtn && !aaBtn.disabled && !isProcessing) {
+    const actionKey = aaBtn.getAttribute('data-aa');
+    if (actionKey) doActiveAction(actionKey);
+    return;
   }
 });
 </script>
