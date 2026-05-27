@@ -67,8 +67,18 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
   "npc_updates": [
     {"name": "陈知夏", "relation": "新的关系描述", "desc": "新的简介"},
     {"name": "林墨", "relation": "竞争加剧"}
-  ]
+  ],
+  "company_update": {"name": "XX设计工作室", "position": "初级设计师", "action": "入职"}
 }
+
+## company_update 规则
+- 游戏开场时必须初始化公司信息（action: "入职"）
+- 之后仅在职业生涯发生重大变动时更新：跳槽、被辞退、升职、创业
+- 无变化时 action 设为 "无变化" 或省略整个字段
+- name 为公司/工作室/品牌名称
+- position 为你的职级
+- action 取值：入职 / 离职 / 晋升 / 创业 / 无变化
+- 女主可以同时有主业和副业，但在剧情中体现即可，company_update 只记录主业
 
 ## npc_updates 规则
 - npc_updates 是可选的，如果没有 NPC 参与本回合剧情可以为空数组 []
@@ -211,6 +221,29 @@ def apply_npc_updates(npcs, npc_updates):
                 name_map[name]['desc'] = update['desc']
     return npcs
 
+def apply_company_update(state, company_update):
+    '''Apply company/job changes from LLM output.'''
+    if not company_update or not isinstance(company_update, dict):
+        return
+    action = company_update.get('action', '无变化')
+    if action == '无变化' or not action:
+        return
+
+    current = state.get('company', {})
+    new_company = {
+        'name': company_update.get('name', current.get('name', '未知')),
+        'position': company_update.get('position', current.get('position', '设计师')),
+        'action': action,
+        'turn': state.get('turn_count', 0)
+    }
+
+    # Record history
+    history = state.get('career_history', [])
+    if current and current.get('name'):
+        history.append({**current, 'left_at_turn': state.get('turn_count', 0)})
+    state['career_history'] = history
+    state['company'] = new_company
+
 # ============================================================
 # Career Title / Stage System
 # ============================================================
@@ -306,6 +339,8 @@ def build_messages(state, player_action=None):
         f'当前头衔: {state.get("title",{}).get("title","见习设计师")}（{state.get("title",{}).get("stage","萌芽期")}）',
         f'资源: {player.get("resources","?")}, 节奏: {player.get("pace","标准")}',
         f'当前回合: 第{story_len+1}回合',
+        '',
+        f'# 当前公司: {state.get("company",{}).get("name","待定")} | 职位: {state.get("company",{}).get("position","设计师")}',
         '',
         '# 属性',
     ]
@@ -445,6 +480,8 @@ def api_new_game():
         result = validate_and_fix_result(result, 0, attributes)
     if result.get('npc_updates'):
         state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
+    if result.get('company_update'):
+        apply_company_update(state, result['company_update'])
 
     state['story_log'].append({
         'turn': 1,
@@ -496,6 +533,8 @@ def api_action():
     result = validate_and_fix_result(result, state['turn_count'], state['attributes'])
     if result.get('npc_updates'):
         state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
+    if result.get('company_update'):
+        apply_company_update(state, result['company_update'])
 
     turn = state['turn_count'] + 1
     entry = {

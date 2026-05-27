@@ -964,6 +964,7 @@ body {
       <div class="player-avatar" id="sb-avatar">林</div>
       <div class="player-name" id="sb-name">林知夏</div>
       <div class="player-origin" id="sb-origin">设计专业应届生</div>
+      <div class="player-origin" id="sb-company" style="color:var(--accent-light);margin-top:4px;font-size:0.7rem">—</div>
       <div class="player-meta">
         <div class="player-meta-item">
           <div class="player-meta-val" id="sb-title" style="font-size:0.75rem;color:var(--accent-light)">见习设计师</div>
@@ -1317,6 +1318,8 @@ function renderAll() {
   document.getElementById('sb-avatar').textContent = (player.name || '林')[0];
   document.getElementById('sb-name').textContent = player.name || '—';
   document.getElementById('sb-origin').textContent = player.origin || '—';
+  const company = gameState.company || {};
+  document.getElementById('sb-company').textContent = company.name ? `${company.name} · ${company.position || '设计师'}` : '—';
   const title = gameState.title || { title: '见习设计师', stage: '萌芽期' };
   document.getElementById('sb-title').textContent = title.title;
   document.getElementById('sb-turn').textContent = gameState.turn_count;
@@ -1605,6 +1608,31 @@ function renderPortfolio() {
   });
   html += `</div></div>`;
 
+  // Career history
+  const history = gameState.career_history || [];
+  const currentCompany = gameState.company || {};
+  html += `<div style="margin:20px 0"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:12px">💼 职业生涯</div>`;
+
+  if (currentCompany.name) {
+    html += `<div style="padding:10px 14px;border-left:3px solid var(--accent);background:var(--accent-bg);border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin-bottom:6px">
+      <div style="font-weight:600;font-size:0.85rem;color:var(--accent)">📍 当前</div>
+      <div style="font-size:0.8rem">${esc(currentCompany.name)} · ${esc(currentCompany.position || '设计师')}</div>
+    </div>`;
+  }
+
+  history.slice().reverse().forEach(h => {
+    html += `<div style="padding:8px 14px;border-left:3px solid var(--surface-3);margin-bottom:4px">
+      <div style="font-size:0.7rem;color:var(--text-tertiary)">第${h.turn||'?'} - ${h.left_at_turn||'?'} 回合</div>
+      <div style="font-size:0.8rem;color:var(--text-secondary)">${esc(h.name || '—')} · ${esc(h.position || '—')}</div>
+    </div>`;
+  });
+
+  if (!currentCompany.name && history.length === 0) {
+    html += `<div style="font-size:0.75rem;color:var(--text-tertiary);padding:8px">职业生涯即将展开</div>`;
+  }
+  html += `</div>`;
+
+  // Projects
   if (projects.length > 0) {
     html += `<div style="margin-top:16px"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:10px">已完成项目</div>`;
     projects.forEach(e => {
