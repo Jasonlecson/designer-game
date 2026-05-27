@@ -78,7 +78,7 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 - desc 可更新该 NPC 的简介，反映你对 ta 的新认知
 - 不需要更新所有 NPC，只更新本回合剧情涉及到的
 
-CRITICAL: choices 数组必须始终包含 2-3 个有意义的选项，分别代表不同的行动方向。绝对不能返回空数组。如果当前场景是结局时刻，可以在 narrative 中描述结局，但 choices 仍应至少包含 2 个选项（如「开始新篇章」「回顾这段旅程」等）。'''
+CRITICAL: choices 数组必须始终包含 2-3 个有意义的选项，分别代表不同的行动方向。绝对不能返回空数组。这是一个没有终点的职业生涯体验，属性低不代表游戏结束，而是意味着新的挑战和转折。'''
 
 # ============================================================
 # NPC Generation
@@ -428,27 +428,11 @@ def api_action():
     state['attributes'] = result['attr_display']
     state['turn_count'] = turn
 
-    # Ending check (minimum 5 rounds before BE can trigger, 15 rounds for HE)
-    attrs = state['attributes']
-    ending = None
-    if state['turn_count'] >= 5 and attrs.get('行业信用', 5) <= 1:
-        ending = {'type': 'be_eliminated', 'text': '行业淘汰——你的行业信用已经跌至冰点。没有人愿意把项目交给你了。'}
-    elif state['turn_count'] >= 5 and attrs.get('抗压阈值', 5) <= 1:
-        ending = {'type': 'be_burnout', 'text': '创作枯竭——你还有能力，但已经没有了继续下去的心力。'}
-    elif attrs.get('作品集厚度', 0) >= 9 and attrs.get('行业信用', 0) >= 8 and state['turn_count'] >= 15:
-        ending = {'type': 'he_breakthrough', 'text': '顶级突破——你的作品集和行业信用都已达到最高水准，你终于站在了你想站的地方。'}
-
-    if ending:
-        state['phase'] = 'ended'
-        state['ending'] = ending
-
     save_state(state)
     return jsonify({
         'ok': True,
         'entry': entry,
         'attributes': state['attributes'],
-        'ending': state.get('ending'),
-        'phase': state['phase'],
         'turn': turn
     })
 
