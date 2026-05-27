@@ -1150,6 +1150,7 @@ body {
         </div>
       </div>
       <div class="topbar-actions">
+        <button class="btn btn-ghost btn-sm" onclick="showSaves()" title="存档管理">📂</button>
         <button class="btn btn-ghost btn-sm" onclick="showConfig()">⚙</button>
       </div>
     </div>
@@ -2110,7 +2111,10 @@ async function showSaves() {
         </div>
       </div>`;
     }
-    html += `<button onclick="closeSaves()" style="margin-top:16px;padding:10px 20px;border:1px solid var(--surface-3);border-radius:var(--radius);background:var(--surface-card);cursor:pointer;width:100%;font-size:0.85rem">关闭</button>`;
+    html += `<div style="margin-top:16px;display:flex;gap:8px">
+      <button onclick="importSave()" style="flex:1;padding:10px 20px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent-bg);color:var(--accent);cursor:pointer;font-size:0.85rem">📥 导入存档</button>
+      <button onclick="closeSaves()" style="flex:1;padding:10px 20px;border:1px solid var(--surface-3);border-radius:var(--radius);background:var(--surface-card);cursor:pointer;font-size:0.85rem">关闭</button>
+    </div>`;
     showModal(html);
   } catch (e) { alert('加载失败: ' + e.message); }
 }
@@ -2145,6 +2149,42 @@ async function deleteSlot(slot) {
     await fetch('/api/saves/delete', { method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({slot}) });
     showSaves();
   } catch (e) { alert('删除失败'); }
+}
+
+function importSave() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json';
+  input.onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const state = JSON.parse(text);
+      if (!state.player || !state.attributes) {
+        alert('存档格式无效');
+        return;
+      }
+      const r = await fetch('/api/import', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({state})
+      });
+      const d = await r.json();
+      if (d.ok) {
+        gameState = d.state;
+        gameState._prev_title = (d.state.title && d.state.title.title) || '';
+        closeSaves();
+        renderAll();
+        showNotification('milestone', '存档导入成功');
+      } else {
+        alert(d.error || '导入失败');
+      }
+    } catch (err) {
+      alert('导入失败: ' + err.message);
+    }
+  };
+  input.click();
 }
 
 function showModal(html) {

@@ -103,18 +103,6 @@ def save_config(cfg):
     with open(CONFIG_FILE, 'w', encoding='utf-8') as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
 
-def load_state():
-    if os.path.exists(STATE_FILE):
-        with open(STATE_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return None
-
-def save_state(state):
-    tmp = STATE_FILE + '.tmp'
-    with open(tmp, 'w', encoding='utf-8') as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
-    os.replace(tmp, STATE_FILE)
-
 # ============================================================
 # System Prompt
 # ============================================================
@@ -1473,6 +1461,17 @@ def api_export():
         mimetype='application/json',
         headers={'Content-Disposition': 'attachment; filename=designer_save.json'}
     )
+
+@app.route('/api/import', methods=['POST'])
+def api_import():
+    data = request.get_json()
+    if not data or 'state' not in data:
+        return jsonify({'error': '无效的存档数据'}), 400
+    state = data['state']
+    if not isinstance(state, dict):
+        return jsonify({'error': '存档格式错误'}), 400
+    save_state(state)
+    return jsonify({'ok': True, 'state': state})
 
 @app.route('/api/reset', methods=['POST'])
 def api_reset():
