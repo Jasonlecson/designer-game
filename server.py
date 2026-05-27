@@ -63,8 +63,20 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
   ],
   "atmosphere": "场景氛围（≤10字）",
   "attr_display": {"审美判断力": 7, "执行力": 6, "商业理解力": 5, "表达与说服力": 6, "行业信用": 5, "自主判断力": 4, "作品集厚度": 3, "抗压阈值": 7},
-  "event_tag": "项目推进 / 行业事件 / 日常 / 转折点 / 倦怠预警"
+  "event_tag": "项目推进 / 行业事件 / 日常 / 转折点 / 倦怠预警",
+  "npc_updates": [
+    {"name": "陈知夏", "relation": "新的关系描述", "desc": "新的简介"},
+    {"name": "林墨", "relation": "竞争加剧"}
+  ]
 }
+
+## npc_updates 规则
+- npc_updates 是可选的，如果没有 NPC 参与本回合剧情可以为空数组 []
+- 仅在剧情中确实出现了该 NPC 时才更新其 relation 和/或 desc
+- name 必须与给定 NPC 列表中的名字完全一致
+- relation 用简短中文描述当前关系状态，如「建立了信任」「首次合作」「产生矛盾」「渐行渐远」
+- desc 可更新该 NPC 的简介，反映你对 ta 的新认知
+- 不需要更新所有 NPC，只更新本回合剧情涉及到的
 
 CRITICAL: choices 数组必须始终包含 2-3 个有意义的选项，分别代表不同的行动方向。绝对不能返回空数组。如果当前场景是结局时刻，可以在 narrative 中描述结局，但 choices 仍应至少包含 2 个选项（如「开始新篇章」「回顾这段旅程」等）。'''
 
@@ -183,6 +195,22 @@ def validate_and_fix_result(result, turn_count, attrs):
         result['attr_display'][key] = max(1, min(10, int(result['attr_display'][key])))
     return result
 
+def apply_npc_updates(npcs, npc_updates):
+    '''Apply LLM-generated NPC relationship updates to the NPC list.'''
+    if not npc_updates or not isinstance(npc_updates, list):
+        return npcs
+    name_map = {n['name']: n for n in npcs}
+    for update in npc_updates:
+        if not isinstance(update, dict):
+            continue
+        name = update.get('name', '')
+        if name in name_map:
+            if 'relation' in update and update['relation']:
+                name_map[name]['relation'] = update['relation']
+            if 'desc' in update and update['desc']:
+                name_map[name]['desc'] = update['desc']
+    return npcs
+
 # ============================================================
 # Build Messages
 # ============================================================
@@ -206,9 +234,9 @@ def build_messages(state, player_action=None):
         parts.append(f'  {k}: {bar} ({v}/10)')
 
     parts.append('')
-    parts.append('# NPC')
+    parts.append('# NPC（含当前关系）')
     for n in npcs[:6]:
-        parts.append(f'  {n["name"]} - {n["role"]}')
+        parts.append(f'  {n["name"]} - {n["role"]} | 关系: {n.get("relation","待展开")} | {n.get("desc","")}')
 
     if state.get('current_project'):
         cp = state['current_project']
@@ -335,6 +363,8 @@ def api_new_game():
         result = validate_and_fix_result({}, 0, attributes)
     else:
         result = validate_and_fix_result(result, 0, attributes)
+    if result.get('npc_updates'):
+        state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
 
     state['story_log'].append({
         'turn': 1,
@@ -381,6 +411,8 @@ def api_action():
         result = validate_and_fix_result({}, state['turn_count'], state['attributes'])
 
     result = validate_and_fix_result(result, state['turn_count'], state['attributes'])
+    if result.get('npc_updates'):
+        state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
 
     turn = state['turn_count'] + 1
     entry = {
