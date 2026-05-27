@@ -7,7 +7,7 @@ from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_from_directory, session
 
 app = Flask(__name__, static_folder='static', static_url_path='')
-app.secret_key = os.environ.get('SECRET_KEY', 'designer-game-' + uuid.uuid4().hex[:16])
+app.secret_key = os.environ.get('SECRET_KEY', 'designer-game-fixed-key-2024')
 
 BASE_DIR = os.path.dirname(__file__)
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
