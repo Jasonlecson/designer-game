@@ -567,6 +567,10 @@ body {
 }
 .choice-btn .ch-text { font-size: 0.88rem; font-weight: 600; color: var(--text-primary); }
 .choice-btn .ch-hint { font-size: 0.72rem; color: var(--text-secondary); margin-top: 5px; }
+.choice-btn .ch-effect {
+  font-size: 0.68rem; color: var(--accent); margin-top: 6px;
+  font-weight: 600; letter-spacing: 0.02em;
+}
 .choice-btn:disabled { opacity: 0.4; cursor: not-allowed; }
 
 /* Career log panel (bottom-left) */
@@ -976,11 +980,19 @@ body {
         </div>
         <div class="player-meta-item">
           <div class="player-meta-val" id="sb-credit">5</div>
-          <div class="player-meta-label">信誉</div>
+          <div class="player-meta-label">表达</div>
         </div>
         <div class="player-meta-item">
           <div class="player-meta-val" id="sb-portfolio">1</div>
           <div class="player-meta-label">作品</div>
+        </div>
+        <div class="player-meta-item">
+          <div class="player-meta-val" id="sb-stamina">80</div>
+          <div class="player-meta-label">精力</div>
+        </div>
+        <div class="player-meta-item">
+          <div class="player-meta-val" id="sb-income">5k</div>
+          <div class="player-meta-label">收入</div>
         </div>
       </div>
     </div>
@@ -1323,8 +1335,11 @@ function renderAll() {
   const title = gameState.title || { title: '见习设计师', stage: '萌芽期' };
   document.getElementById('sb-title').textContent = title.title;
   document.getElementById('sb-turn').textContent = gameState.turn_count;
-  document.getElementById('sb-credit').textContent = attrs['行业信用'] || 5;
+  document.getElementById('sb-credit').textContent = attrs['表达能力'] || 5;
   document.getElementById('sb-portfolio').textContent = attrs['作品集厚度'] || 1;
+  document.getElementById('sb-stamina').textContent = gameState.stamina || 80;
+  const inc = gameState.income || 5000;
+  document.getElementById('sb-income').textContent = inc >= 10000 ? (inc/10000).toFixed(1)+'w' : (inc/1000).toFixed(0)+'k';
 
   // Topbar
   document.getElementById('tb-location').textContent = player.city || '上海';
@@ -1369,7 +1384,7 @@ function renderTab(tab) {
 // ============= SIDEBAR RENDERERS =============
 function renderAttrs(attrs) {
   const list = document.getElementById('sb-attrs');
-  const icons = { '审美判断力': '🎨', '执行力': '🔧', '商业理解力': '💼', '表达与说服力': '🗣', '行业信用': '🤝', '自主判断力': '🧭', '作品集厚度': '📦', '抗压阈值': '⚡' };
+  const icons = { '审美判断力': '🎨', '执行能力': '🔧', '商业思维': '💼', '表达能力': '🗣', '创意深度': '💡', '作品集厚度': '📦' };
   let html = '';
   for (const [k, v] of Object.entries(attrs)) {
     const cls = v >= 7 ? 'high' : v >= 4 ? 'mid' : 'low';
@@ -1416,6 +1431,7 @@ function renderDashboard() {
         <div class="ch-letter">${esc(ch.id)}</div>
         <div class="ch-text">${esc(ch.text)}</div>
         <div class="ch-hint">${esc(ch.hint||'')}</div>
+        ${ch.effect ? `<div class="ch-effect">${esc(ch.effect)}</div>` : ''}
       </button>`;
     });
     choicesEl.innerHTML = chHtml;
@@ -1436,7 +1452,7 @@ function renderDashboard() {
 function renderMobileAttrs(attrs) {
   const el = document.getElementById('mobile-attrs');
   if (!el) return;
-  const icons = { '审美判断力': '🎨', '执行力': '🔧', '商业理解力': '💼', '表达与说服力': '🗣', '行业信用': '🤝', '自主判断力': '🧭', '作品集厚度': '📦', '抗压阈值': '⚡' };
+  const icons = { '审美判断力': '🎨', '执行能力': '🔧', '商业思维': '💼', '表达能力': '🗣', '创意深度': '💡', '作品集厚度': '📦' };
   let html = '';
   for (const [k, v] of Object.entries(attrs)) {
     const cls = v >= 7 ? 'var(--success)' : v >= 4 ? 'var(--accent-light)' : '#d4846a';
@@ -1589,11 +1605,11 @@ function renderPortfolio() {
     {id:'first_project',name:'初出茅庐',desc:'完成第一个项目',icon:'🌱'},
     {id:'portfolio_5',name:'作品等身',desc:'作品集厚度达到5',icon:'📦'},
     {id:'portfolio_8',name:'业界标杆',desc:'作品集厚度达到8',icon:'🏆'},
-    {id:'credit_7',name:'金字招牌',desc:'行业信用达到7',icon:'🤝'},
-    {id:'credit_9',name:'德高望重',desc:'行业信用达到9',icon:'👑'},
+    {id:'expression_7',name:'金字招牌',desc:'表达能力达到7',icon:'🤝'},
+    {id:'expression_9',name:'德高望重',desc:'表达能力达到9',icon:'👑'},
     {id:'aesthetic_8',name:'审美大师',desc:'审美判断力达到8',icon:'🎨'},
-    {id:'stress_low',name:'至暗时刻',desc:'抗压阈值降到2以下',icon:'🌑'},
-    {id:'stress_recover',name:'涅槃重生',desc:'从低谷恢复',icon:'🔥'},
+    {id:'stamina_low',name:'至暗时刻',desc:'精力值降到10以下',icon:'🌑'},
+    {id:'stamina_recover',name:'涅槃重生',desc:'从低谷恢复',icon:'🔥'},
     {id:'npc_3_related',name:'社交达人',desc:'3位NPC建立关系',icon:'💬'},
     {id:'turn_20',name:'十年磨一剑',desc:'20回合',icon:'⏳'},
     {id:'turn_50',name:'老设计师',desc:'50回合',icon:'📜'},
@@ -1677,6 +1693,8 @@ async function makeChoice(choiceId) {
     }
     if (d.entry) gameState.story_log.push(d.entry);
     if (d.attributes) gameState.attributes = d.attributes;
+    if (d.stamina !== undefined) gameState.stamina = d.stamina;
+    if (d.income !== undefined) gameState.income = d.income;
     if (d.title) gameState.title = d.title;
     if (d.new_achievements && d.new_achievements.length > 0) {
       gameState.new_achievements = d.new_achievements;

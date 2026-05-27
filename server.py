@@ -50,45 +50,69 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 - 叙事信息有限性：只描述第一视角所见所闻，不透露 NPC 隐藏意图。
 - 没有恋爱线。NPC 限于：同事、导师、竞争对手、甲方、合作者、行业前辈。
 
-## 职业属性（1-10分）
-审美判断力、执行力、商业理解力、表达与说服力、行业信用、自主判断力、作品集厚度、抗压阈值
+## 核心属性（1-10分）
+审美判断力 — 视觉品味、风格把控、设计决策
+执行能力   — 落地速度、改稿效率、抗压韧性
+商业思维   — 定价谈判、理解客户需求、市场嗅觉
+表达能力   — 提案说服、建立人脉、行业声誉
+创意深度   — 概念思考、原创性、独立判断
+作品集厚度 — 综合产出指标，积累优质作品
+
+## 资源系统
+精力值：0-100，每次行动消耗 5-15（加班消耗大，休息可恢复）
+月收入：数字，随雇主/职级变化，不够时产生生存压力
+当精力<20 时女主表现出疲劳、效率下降、易出错
+当月收入不足以支撑生活时产生焦虑叙事
+
+## 选项后果系统（CRITICAL）
+每个选项必须标注「短期后果」和「属性影响」，让玩家知道选择在改变什么：
+
+短期后果：本回合的直接结果（≤12字），如「甲方同意了方案」「熬夜赶工到凌晨」
+属性影响：格式 "属性名±数字"，如 "审美+1 执行-2"
+- 每回合的属性总变化幅度控制在 -3 ~ +3 之间
+- 不要所有选项都纯正面——好的东西需要代价
 
 ## 输出格式（严格JSON，只输出JSON，不要任何额外文字）
 {
   "narrative": "用第二人称「你」叙述本回合剧情，150-300字，生动具体",
   "choices": [
-    {"id": "A", "text": "选项A（≤20字）", "hint": "后果提示（≤15字）"},
-    {"id": "B", "text": "选项B（≤20字）", "hint": "后果提示（≤15字）"},
-    {"id": "C", "text": "选项C（≤20字）", "hint": "后果提示（≤15字）"}
+    {"id": "A", "text": "选项A（≤20字）", "hint": "短期后果（≤12字）", "effect": "审美+1 执行-1"},
+    {"id": "B", "text": "选项B（≤20字）", "hint": "短期后果（≤12字）", "effect": "商业+1"},
+    {"id": "C", "text": "选项C（≤20字）", "hint": "短期后果（≤12字）", "effect": "表达+1 精力+15"}
   ],
   "atmosphere": "场景氛围（≤10字）",
-  "attr_display": {"审美判断力": 7, "执行力": 6, "商业理解力": 5, "表达与说服力": 6, "行业信用": 5, "自主判断力": 4, "作品集厚度": 3, "抗压阈值": 7},
+  "attr_display": {"审美判断力": 7, "执行能力": 6, "商业思维": 5, "表达能力": 6, "创意深度": 4, "作品集厚度": 3},
+  "stamina_change": -8,
+  "income_change": 0,
   "event_tag": "项目推进 / 行业事件 / 日常 / 转折点 / 倦怠预警",
   "npc_updates": [
-    {"name": "陈知夏", "relation": "新的关系描述", "desc": "新的简介"},
-    {"name": "林墨", "relation": "竞争加剧"}
+    {"name": "陈知夏", "relation": "新的关系描述", "desc": "新的简介"}
   ],
   "company_update": {"name": "XX设计工作室", "position": "初级设计师", "action": "入职"}
 }
+
+## stamina_change / income_change 规则
+- stamina_change: 本轮精力的变化量（正=休息恢复，负=消耗），范围 -15 ~ +20
+- income_change: 月收入的增减（正=加薪/奖金，负=降薪/罚款），单位：元/月
+- 加班、改稿、提案通常消耗精力；休息、度假、完成项目获得恢复
+- 升职、跳槽成功带来收入增加；被裁、降薪带来收入减少
+
+## choice.effect 规则
+- effect 格式："属性简称±数字 属性简称±数字"，空格分隔
+- 属性简称映射：审美=审美判断力 执行=执行能力 商业=商业思维 表达=表达能力 创意=创意深度 作品=作品集厚度 精力=精力值 收入=月收入
+- 必须至少包含一个属性变化
+- 示例: "审美+1" / "执行-2 精力-10" / "商业+1 表达+1 精力-5"
 
 ## company_update 规则
 - 游戏开场时必须初始化公司信息（action: "入职"）
 - 之后仅在职业生涯发生重大变动时更新：跳槽、被辞退、升职、创业
 - 无变化时 action 设为 "无变化" 或省略整个字段
-- name 为公司/工作室/品牌名称
-- position 为你的职级
-- action 取值：入职 / 离职 / 晋升 / 创业 / 无变化
-- 女主可以同时有主业和副业，但在剧情中体现即可，company_update 只记录主业
 
 ## npc_updates 规则
 - npc_updates 是可选的，如果没有 NPC 参与本回合剧情可以为空数组 []
 - 仅在剧情中确实出现了该 NPC 时才更新其 relation 和/或 desc
-- name 必须与给定 NPC 列表中的名字完全一致
-- relation 用简短中文描述当前关系状态，如「建立了信任」「首次合作」「产生矛盾」「渐行渐远」
-- desc 可更新该 NPC 的简介，反映你对 ta 的新认知
-- 不需要更新所有 NPC，只更新本回合剧情涉及到的
 
-CRITICAL: choices 数组必须始终包含 2-3 个有意义的选项，分别代表不同的行动方向。绝对不能返回空数组。这是一个没有终点的职业生涯体验，属性低不代表游戏结束，而是意味着新的挑战和转折。'''
+CRITICAL: choices 数组必须始终包含 2-3 个有意义的选项。这是一个没有终点的职业生涯体验，属性低不代表游戏结束。'''
 
 # ============================================================
 # NPC Generation
@@ -157,15 +181,15 @@ def call_llm(messages, api_base, api_key, model):
 def make_fallback_choices(turn_count, attrs):
     '''Always return valid choices, never empty.'''
     base = [
-        {'id': 'A', 'text': '继续当前的工作节奏', 'hint': '稳扎稳打'},
-        {'id': 'B', 'text': '主动寻求新机会', 'hint': '冒险但可能突破'},
-        {'id': 'C', 'text': '停下来复盘和思考', 'hint': '恢复和规划'},
+        {'id': 'A', 'text': '继续当前的工作节奏', 'hint': '稳扎稳打', 'effect': '执行+1'},
+        {'id': 'B', 'text': '主动寻求新机会', 'hint': '冒险但可能突破', 'effect': '商业+1 精力-8'},
+        {'id': 'C', 'text': '停下来复盘和思考', 'hint': '恢复和规划', 'effect': '创意+1 精力+15'},
     ]
     if turn_count % 7 == 0:
         return [
-            {'id': 'A', 'text': '抓住这个转折机会', 'hint': '职业跃升的可能'},
-            {'id': 'B', 'text': '谨慎观望再做决定', 'hint': '保守但安全'},
-            {'id': 'C', 'text': '和信任的人商量一下', 'hint': '借助他人视角'},
+            {'id': 'A', 'text': '抓住这个转折机会', 'hint': '职业跃升', 'effect': '表达+1 商业+1 精力-10'},
+            {'id': 'B', 'text': '谨慎观望再做决定', 'hint': '保守安全', 'effect': '执行+2'},
+            {'id': 'C', 'text': '和信任的人商量一下', 'hint': '借助他人视角', 'effect': '表达+2'},
         ]
     return base
 
@@ -180,13 +204,15 @@ def validate_and_fix_result(result, turn_count, attrs):
     # Ensure each choice has required fields
     for i, ch in enumerate(result['choices']):
         if not isinstance(ch, dict):
-            result['choices'][i] = {'id': chr(65+i), 'text': f'继续推进', 'hint': '下一步'}
+            result['choices'][i] = {'id': chr(65+i), 'text': f'继续推进', 'hint': '下一步', 'effect': ''}
         if 'id' not in ch:
             ch['id'] = chr(65+i)
         if 'text' not in ch:
             ch['text'] = '继续推进'
         if 'hint' not in ch:
             ch['hint'] = ''
+        if 'effect' not in ch:
+            ch['effect'] = ''
     # Ensure 2-3 choices
     if len(result['choices']) < 2:
         result['choices'] = make_fallback_choices(turn_count, attrs)
@@ -198,11 +224,20 @@ def validate_and_fix_result(result, turn_count, attrs):
         result['event_tag'] = '日常'
     if not result.get('attr_display'):
         result['attr_display'] = attrs
-    # Ensure all 8 attributes are present
-    for key in ['审美判断力', '执行力', '商业理解力', '表达与说服力', '行业信用', '自主判断力', '作品集厚度', '抗压阈值']:
+    # Ensure all 6 attributes are present
+    for key in ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']:
         if key not in result['attr_display']:
             result['attr_display'][key] = attrs.get(key, 5)
         result['attr_display'][key] = max(1, min(10, int(result['attr_display'][key])))
+    # Stamina & income
+    if 'stamina_change' not in result:
+        result['stamina_change'] = -5
+    if 'income_change' not in result:
+        result['income_change'] = 0
+    # Ensure each choice has effect field
+    for ch in result.get('choices', []):
+        if 'effect' not in ch:
+            ch['effect'] = ''
     return result
 
 def apply_npc_updates(npcs, npc_updates):
@@ -248,28 +283,26 @@ def apply_company_update(state, company_update):
 # Career Title / Stage System
 # ============================================================
 TITLE_THRESHOLDS = [
-    # (title, stage_name, conditions)
-    # conditions: {attr_name: min_value, ...} — all must be met
     {'title': '见习设计师',     'stage': '萌芽期', 'attrs': {}},
-    {'title': '初级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 3, '执行力': 3}},
-    {'title': '中级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 5, '执行力': 5, '作品集厚度': 3}},
-    {'title': '高级设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 7, '执行力': 6, '作品集厚度': 5, '行业信用': 5}},
-    {'title': '资深设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 7, '执行力': 7, '作品集厚度': 7, '行业信用': 6, '商业理解力': 5}},
-    {'title': '设计总监',       'stage': '巅峰期', 'attrs': {'审美判断力': 8, '执行力': 7, '作品集厚度': 8, '行业信用': 7, '商业理解力': 7, '表达与说服力': 7}},
-    {'title': '创意合伙人',     'stage': '巅峰期', 'attrs': {'审美判断力': 9, '执行力': 8, '作品集厚度': 9, '行业信用': 8, '商业理解力': 8, '表达与说服力': 8, '自主判断力': 8}},
-    {'title': '独立设计大师',   'stage': '传奇',   'attrs': {'审美判断力': 9, '作品集厚度': 10, '行业信用': 9, '自主判断力': 9}},
+    {'title': '初级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 3, '执行能力': 3}},
+    {'title': '中级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 5, '执行能力': 5, '作品集厚度': 3}},
+    {'title': '高级设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 7, '执行能力': 6, '作品集厚度': 5, '表达能力': 5}},
+    {'title': '资深设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 7, '执行能力': 7, '作品集厚度': 7, '表达能力': 6, '商业思维': 5}},
+    {'title': '设计总监',       'stage': '巅峰期', 'attrs': {'审美判断力': 8, '执行能力': 7, '作品集厚度': 8, '表达能力': 7, '商业思维': 7, '创意深度': 7}},
+    {'title': '创意合伙人',     'stage': '巅峰期', 'attrs': {'审美判断力': 9, '执行能力': 8, '作品集厚度': 9, '表达能力': 8, '商业思维': 8, '创意深度': 8}},
+    {'title': '独立设计大师',   'stage': '传奇',   'attrs': {'审美判断力': 9, '作品集厚度': 10, '表达能力': 9, '创意深度': 9}},
 ]
 
 ACHIEVEMENTS = [
     {'id': 'first_project',  'name': '初出茅庐', 'desc': '完成第一个设计项目', 'icon': '🌱'},
     {'id': 'portfolio_5',    'name': '作品等身', 'desc': '作品集厚度达到 5',  'icon': '📦'},
     {'id': 'portfolio_8',    'name': '业界标杆', 'desc': '作品集厚度达到 8',  'icon': '🏆'},
-    {'id': 'credit_7',       'name': '金字招牌', 'desc': '行业信用达到 7',    'icon': '🤝'},
-    {'id': 'credit_9',       'name': '德高望重', 'desc': '行业信用达到 9',    'icon': '👑'},
+    {'id': 'expression_7',   'name': '金字招牌', 'desc': '表达能力达到 7',    'icon': '🤝'},
+    {'id': 'expression_9',   'name': '德高望重', 'desc': '表达能力达到 9',    'icon': '👑'},
     {'id': 'aesthetic_8',    'name': '审美大师', 'desc': '审美判断力达到 8',  'icon': '🎨'},
-    {'id': 'stress_low',     'name': '至暗时刻', 'desc': '抗压阈值降到 2 以下','icon': '🌑'},
-    {'id': 'stress_recover', 'name': '涅槃重生', 'desc': '抗压阈值从低谷恢复到 6 以上', 'icon': '🔥'},
-    {'id': 'npc_3_related',  'name': '社交达人', 'desc': '与 3 位以上 NPC 建立非默认关系', 'icon': '💬'},
+    {'id': 'stamina_low',    'name': '至暗时刻', 'desc': '精力值降到 10 以下','icon': '🌑'},
+    {'id': 'stamina_recover','name': '涅槃重生', 'desc': '精力从低谷恢复到 70+','icon': '🔥'},
+    {'id': 'npc_3_related',  'name': '社交达人', 'desc': '与 3 位 NPC 建立关系', 'icon': '💬'},
     {'id': 'turn_20',        'name': '十年磨一剑', 'desc': '职业生涯超过 20 回合', 'icon': '⏳'},
     {'id': 'turn_50',        'name': '老设计师',   'desc': '职业生涯超过 50 回合', 'icon': '📜'},
     {'id': 'all_rounder',    'name': '六边形战士', 'desc': '所有属性达到 6 以上', 'icon': '⭐'},
@@ -284,11 +317,12 @@ def calculate_title(attrs):
             current = t
     return current
 
-def check_achievements(state, prev_attrs=None):
+def check_achievements(state, prev_stamina=None):
     '''Check and unlock new achievements. Returns list of newly unlocked.'''
     attrs = state.get('attributes', {})
     npcs = state.get('npcs', [])
     turn = state.get('turn_count', 0)
+    stamina = state.get('stamina', 80)
     unlocked = set(state.get('unlocked_achievements', []))
     new_unlocks = []
 
@@ -300,14 +334,14 @@ def check_achievements(state, prev_attrs=None):
     # Attribute-based
     if attrs.get('作品集厚度', 0) >= 5: unlock('portfolio_5')
     if attrs.get('作品集厚度', 0) >= 8: unlock('portfolio_8')
-    if attrs.get('行业信用', 0) >= 7: unlock('credit_7')
-    if attrs.get('行业信用', 0) >= 9: unlock('credit_9')
+    if attrs.get('表达能力', 0) >= 7: unlock('expression_7')
+    if attrs.get('表达能力', 0) >= 9: unlock('expression_9')
     if attrs.get('审美判断力', 0) >= 8: unlock('aesthetic_8')
 
-    # Stress lows
-    if attrs.get('抗压阈值', 0) <= 2: unlock('stress_low')
-    if prev_attrs and prev_attrs.get('抗压阈值', 5) <= 2 and attrs.get('抗压阈值', 5) >= 6:
-        unlock('stress_recover')
+    # Stamina
+    if stamina <= 10: unlock('stamina_low')
+    if prev_stamina is not None and prev_stamina <= 10 and stamina >= 70:
+        unlock('stamina_recover')
 
     # NPC relationships
     related_count = sum(1 for n in npcs if n.get('relation', '待剧情展开') != '待剧情展开')
@@ -318,7 +352,7 @@ def check_achievements(state, prev_attrs=None):
     if turn >= 50: unlock('turn_50')
 
     # All-rounder
-    all_attrs = ['审美判断力', '执行力', '商业理解力', '表达与说服力', '行业信用', '自主判断力', '作品集厚度', '抗压阈值']
+    all_attrs = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']
     if all(attrs.get(k, 0) >= 6 for k in all_attrs): unlock('all_rounder')
 
     # First project — check if any log entry has event_tag '项目推进'
@@ -341,6 +375,10 @@ def build_messages(state, player_action=None):
         f'当前回合: 第{story_len+1}回合',
         '',
         f'# 当前公司: {state.get("company",{}).get("name","待定")} | 职位: {state.get("company",{}).get("position","设计师")}',
+        '',
+        '# 资源',
+        f'  精力值: {state.get("stamina",80)}/100',
+        f'  月收入: {state.get("income",5000)}元',
         '',
         '# 属性',
     ]
@@ -436,13 +474,13 @@ def api_new_game():
     }
 
     attr_base = {
-        '应届生': {'审美判断力': 6, '执行力': 3, '商业理解力': 2, '表达与说服力': 4, '行业信用': 2, '自主判断力': 5, '作品集厚度': 1, '抗压阈值': 6},
-        '乙方执行': {'审美判断力': 5, '执行力': 7, '商业理解力': 4, '表达与说服力': 5, '行业信用': 5, '自主判断力': 3, '作品集厚度': 4, '抗压阈值': 7},
-        '甲方品牌': {'审美判断力': 4, '执行力': 5, '商业理解力': 7, '表达与说服力': 6, '行业信用': 5, '自主判断力': 3, '作品集厚度': 3, '抗压阈值': 5},
-        '媒体编辑': {'审美判断力': 7, '执行力': 3, '商业理解力': 5, '表达与说服力': 8, '行业信用': 4, '自主判断力': 6, '作品集厚度': 1, '抗压阈值': 5},
-        '自由职业': {'审美判断力': 5, '执行力': 6, '商业理解力': 3, '表达与说服力': 5, '行业信用': 3, '自主判断力': 7, '作品集厚度': 2, '抗压阈值': 4},
-        '印刷厂': {'审美判断力': 4, '执行力': 8, '商业理解力': 3, '表达与说服力': 4, '行业信用': 4, '自主判断力': 4, '作品集厚度': 0, '抗压阈值': 6},
-        '自定义': {'审美判断力': 5, '执行力': 5, '商业理解力': 5, '表达与说服力': 5, '行业信用': 5, '自主判断力': 5, '作品集厚度': 0, '抗压阈值': 5},
+        '应届生': {'审美判断力': 6, '执行能力': 4, '商业思维': 2, '表达能力': 4, '创意深度': 6, '作品集厚度': 1},
+        '乙方执行': {'审美判断力': 5, '执行能力': 7, '商业思维': 4, '表达能力': 5, '创意深度': 3, '作品集厚度': 4},
+        '甲方品牌': {'审美判断力': 4, '执行能力': 5, '商业思维': 7, '表达能力': 6, '创意深度': 3, '作品集厚度': 3},
+        '媒体编辑': {'审美判断力': 7, '执行能力': 3, '商业思维': 5, '表达能力': 8, '创意深度': 5, '作品集厚度': 1},
+        '自由职业': {'审美判断力': 5, '执行能力': 6, '商业思维': 3, '表达能力': 5, '创意深度': 6, '作品集厚度': 2},
+        '印刷厂':   {'审美判断力': 4, '执行能力': 8, '商业思维': 3, '表达能力': 4, '创意深度': 2, '作品集厚度': 0},
+        '自定义':   {'审美判断力': 5, '执行能力': 5, '商业思维': 5, '表达能力': 5, '创意深度': 5, '作品集厚度': 0},
     }
 
     origin_key = '应届生' if '应届' in player['origin'] else \
@@ -454,9 +492,9 @@ def api_new_game():
 
     attributes = attr_base.get(origin_key, attr_base['自定义']).copy()
     if '引路人' in player['resources']:
-        attributes['行业信用'] = min(10, attributes['行业信用'] + 2)
+        attributes['表达能力'] = min(10, attributes['表达能力'] + 2)
     if '人脉' in player['resources']:
-        attributes['行业信用'] = min(10, attributes['行业信用'] + 1)
+        attributes['表达能力'] = min(10, attributes['表达能力'] + 1)
         attributes['作品集厚度'] = min(10, attributes['作品集厚度'] + 1)
 
     npcs = generate_npcs()
@@ -469,6 +507,8 @@ def api_new_game():
         'story_log': [],
         'current_project': None,
         'turn_count': 0,
+        'stamina': 80,
+        'income': 5000,
         'created_at': datetime.now().isoformat(),
     }
 
@@ -548,20 +588,24 @@ def api_action():
     }
     state['story_log'].append(entry)
     state['attributes'] = result['attr_display']
+    state['stamina'] = max(0, min(100, state.get('stamina', 80) + result.get('stamina_change', -5)))
+    state['income'] = max(0, state.get('income', 5000) + result.get('income_change', 0))
     state['turn_count'] = turn
 
     # Title & achievements
-    prev_attrs = state.get('_prev_attrs', state['attributes'])
+    prev_stamina = state.get('_prev_stamina', state.get('stamina', 80))
     state['title'] = calculate_title(state['attributes'])
-    new_ach, unlocked = check_achievements(state, prev_attrs)
+    new_ach, unlocked = check_achievements(state, prev_stamina)
     state['unlocked_achievements'] = list(unlocked)
-    state['_prev_attrs'] = dict(state['attributes'])  # save for next round's comparison
+    state['_prev_stamina'] = state['stamina']
 
     save_state(state)
     return jsonify({
         'ok': True,
         'entry': entry,
         'attributes': state['attributes'],
+        'stamina': state['stamina'],
+        'income': state['income'],
         'title': state['title'],
         'new_achievements': [a for a in ACHIEVEMENTS if a['id'] in new_ach],
         'turn': turn
