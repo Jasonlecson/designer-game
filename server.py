@@ -60,9 +60,9 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 
 ## 资源系统
 精力值：0-100，每次行动消耗 5-15（加班消耗大，休息可恢复）
-月收入：数字，随雇主/职级变化，不够时产生生存压力
+储蓄：手头可支配资金，初始低，随收入/支出增减
 当精力<20 时女主表现出疲劳、效率下降、易出错
-当月收入不足以支撑生活时产生焦虑叙事
+当储蓄不足以支撑生活时产生焦虑叙事
 
 ## 选项后果系统（CRITICAL）
 每个选项必须标注「短期后果」和「属性影响」，让玩家知道选择在改变什么：
@@ -83,7 +83,7 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
   "atmosphere": "场景氛围（≤10字）",
   "attr_display": {"审美判断力": 7, "执行能力": 6, "商业思维": 5, "表达能力": 6, "创意深度": 4, "作品集厚度": 3},
   "stamina_change": -8,
-  "income_change": 0,
+  "savings_change": 0,
   "event_tag": "项目推进 / 行业事件 / 日常 / 转折点 / 倦怠预警",
   "npc_updates": [
     {"name": "陈知夏", "relation": "新的关系描述", "desc": "新的简介"}
@@ -91,15 +91,15 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
   "company_update": {"name": "XX设计工作室", "position": "初级设计师", "action": "入职"}
 }
 
-## stamina_change / income_change 规则
+## stamina_change / savings_change 规则
 - stamina_change: 本轮精力的变化量（正=休息恢复，负=消耗），范围 -15 ~ +20
-- income_change: 月收入的增减（正=加薪/奖金，负=降薪/罚款），单位：元/月
+- savings_change: 储蓄的增减（正=收入进账/项目酬劳，负=消费/交租/降薪），单位：元
 - 加班、改稿、提案通常消耗精力；休息、度假、完成项目获得恢复
-- 升职、跳槽成功带来收入增加；被裁、降薪带来收入减少
+- 完成项目、升职带来储蓄增长；被裁、日常开销带来储蓄减少
 
 ## choice.effect 规则
 - effect 格式："属性简称±数字 属性简称±数字"，空格分隔
-- 属性简称映射：审美=审美判断力 执行=执行能力 商业=商业思维 表达=表达能力 创意=创意深度 作品=作品集厚度 精力=精力值 收入=月收入
+- 属性简称映射：审美=审美判断力 执行=执行能力 商业=商业思维 表达=表达能力 创意=创意深度 作品=作品集厚度 精力=精力值 储蓄=储蓄
 - 必须至少包含一个属性变化
 - 示例: "审美+1" / "执行-2 精力-10" / "商业+1 表达+1 精力-5"
 
@@ -229,11 +229,11 @@ def validate_and_fix_result(result, turn_count, attrs):
         if key not in result['attr_display']:
             result['attr_display'][key] = attrs.get(key, 5)
         result['attr_display'][key] = max(1, min(10, int(result['attr_display'][key])))
-    # Stamina & income
+    # Stamina & savings
     if 'stamina_change' not in result:
         result['stamina_change'] = -5
-    if 'income_change' not in result:
-        result['income_change'] = 0
+    if 'savings_change' not in result:
+        result['savings_change'] = 0
     # Ensure each choice has effect field
     for ch in result.get('choices', []):
         if 'effect' not in ch:
@@ -378,7 +378,7 @@ def build_messages(state, player_action=None):
         '',
         '# 资源',
         f'  精力值: {state.get("stamina",80)}/100',
-        f'  月收入: {state.get("income",5000)}元',
+        f'  储蓄: {state.get("savings",3000)}元',
         '',
         '# 属性',
     ]
@@ -508,7 +508,7 @@ def api_new_game():
         'current_project': None,
         'turn_count': 0,
         'stamina': 80,
-        'income': 5000,
+        'savings': 3000,
         'created_at': datetime.now().isoformat(),
     }
 
@@ -589,7 +589,7 @@ def api_action():
     state['story_log'].append(entry)
     state['attributes'] = result['attr_display']
     state['stamina'] = max(0, min(100, state.get('stamina', 80) + result.get('stamina_change', -5)))
-    state['income'] = max(0, state.get('income', 5000) + result.get('income_change', 0))
+    state['savings'] = max(0, state.get('savings', 3000) + result.get('savings_change', 0))
     state['turn_count'] = turn
 
     # Title & achievements
@@ -605,7 +605,7 @@ def api_action():
         'entry': entry,
         'attributes': state['attributes'],
         'stamina': state['stamina'],
-        'income': state['income'],
+        'savings': state['savings'],
         'title': state['title'],
         'new_achievements': [a for a in ACHIEVEMENTS if a['id'] in new_ach],
         'turn': turn

@@ -991,8 +991,8 @@ body {
           <div class="player-meta-label">精力</div>
         </div>
         <div class="player-meta-item">
-          <div class="player-meta-val" id="sb-income">5k</div>
-          <div class="player-meta-label">收入</div>
+          <div class="player-meta-val" id="sb-savings">3k</div>
+          <div class="player-meta-label">储蓄</div>
         </div>
       </div>
     </div>
@@ -1338,8 +1338,8 @@ function renderAll() {
   document.getElementById('sb-credit').textContent = attrs['表达能力'] || 5;
   document.getElementById('sb-portfolio').textContent = attrs['作品集厚度'] || 1;
   document.getElementById('sb-stamina').textContent = gameState.stamina || 80;
-  const inc = gameState.income || 5000;
-  document.getElementById('sb-income').textContent = inc >= 10000 ? (inc/10000).toFixed(1)+'w' : (inc/1000).toFixed(0)+'k';
+  const sav = gameState.savings || 3000;
+  document.getElementById('sb-savings').textContent = sav >= 10000 ? (sav/10000).toFixed(1)+'w' : (sav/1000).toFixed(0)+'k';
 
   // Topbar
   document.getElementById('tb-location').textContent = player.city || '上海';
@@ -1694,7 +1694,7 @@ async function makeChoice(choiceId) {
     if (d.entry) gameState.story_log.push(d.entry);
     if (d.attributes) gameState.attributes = d.attributes;
     if (d.stamina !== undefined) gameState.stamina = d.stamina;
-    if (d.income !== undefined) gameState.income = d.income;
+    if (d.savings !== undefined) gameState.savings = d.savings;
     if (d.title) gameState.title = d.title;
     if (d.new_achievements && d.new_achievements.length > 0) {
       gameState.new_achievements = d.new_achievements;
