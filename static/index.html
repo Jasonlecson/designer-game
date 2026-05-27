@@ -1766,15 +1766,63 @@ function renderNPCFull() {
   }
   let html = '';
   npcs.forEach((n, i) => {
-    html += `<div class="npc-panel-card">
+    html += `<div class="npc-panel-card" onclick="showNPCInteraction('${n.id}')" style="cursor:pointer">
       <div class="npc-panel-avatar" style="background:${avatarColors[i%avatarColors.length]}">${n.name[0]}</div>
       <div class="npc-panel-name">${esc(n.name)}</div>
       <div class="npc-panel-role">${esc(n.role)}</div>
       <div class="npc-panel-rel">${esc(n.relation || '待展开')}</div>
       <div style="font-size:0.65rem;color:var(--text-tertiary);margin-top:4px">${esc(n.desc || '')}</div>
+      <div style="margin-top:8px;font-size:0.65rem;color:var(--accent)">点击互动</div>
     </div>`;
   });
   grid.innerHTML = html;
+}
+
+async function showNPCInteraction(npcId) {
+  try {
+    const r = await fetch('/api/npc/options', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({npc_id: npcId})
+    });
+    const d = await r.json();
+    if (!d.ok) { alert(d.error); return; }
+    const npc = d.npc;
+    const options = d.options;
+    let html = `<h3 style="font-family:var(--font-serif);margin-bottom:16px;font-size:1.1rem">与 ${esc(npc.name)} 互动</h3>`;
+    html += `<div style="font-size:0.75rem;color:var(--text-secondary);margin-bottom:16px">${esc(npc.role)} · ${esc(npc.relation || '待展开')}</div>`;
+    html += '<div style="display:flex;flex-direction:column;gap:8px">';
+    options.forEach(opt => {
+      const disabled = !opt.available;
+      const costText = opt.stamina_cost > 0 ? `精力-${opt.stamina_cost}` : opt.stamina_cost < 0 ? `精力+${Math.abs(opt.stamina_cost)}` : '无消耗';
+      html += `<button onclick="doNPCInteraction('${npcId}', '${opt.id}')" 
+        style="padding:12px 16px;border:1px solid ${disabled ? 'var(--surface-3)' : 'var(--accent)'};border-radius:var(--radius);
+        background:${disabled ? 'var(--surface-1)' : 'var(--accent-bg)'};color:${disabled ? 'var(--text-tertiary)' : 'var(--accent)'};
+        cursor:${disabled ? 'not-allowed' : 'pointer'};text-align:left;opacity:${disabled ? 0.6 : 1}">
+        <div style="font-weight:600;font-size:0.85rem">${esc(opt.text)}</div>
+        <div style="font-size:0.72rem;margin-top:4px;color:var(--text-secondary)">${esc(costText)} · ${esc(opt.effect)}</div>
+      </button>`;
+    });
+    html += '</div>';
+    html += `<button onclick="closeSaves()" style="margin-top:12px;padding:10px 20px;border:1px solid var(--surface-3);border-radius:var(--radius);background:var(--surface-card);cursor:pointer;width:100%;font-size:0.85rem">关闭</button>`;
+    showModal(html);
+  } catch (e) { alert('加载失败: ' + e.message); }
+}
+
+async function doNPCInteraction(npcId, actionId) {
+  try {
+    const r = await fetch('/api/npc/interact', {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({npc_id: npcId, action_id: actionId})
+    });
+    const d = await r.json();
+    if (!d.ok) { alert(d.error); return; }
+    gameState = d.state;
+    closeSaves();
+    renderAll();
+    showNotification('milestone', d.result + (d.effect !== '无变化' ? ` (${d.effect})` : ''));
+  } catch (e) { alert('互动失败: ' + e.message); }
 }
 
 // ============= PORTFOLIO TAB =============

@@ -1483,6 +1483,114 @@ def api_reset():
     return jsonify({'ok': True})
 
 # ============================================================
+# NPC Interaction System
+# ============================================================
+NPC_INTERACTIONS = {
+    '行业前辈/导师': [
+        {'id': 'ask_advice', 'text': '请教职业建议', 'effect': '表达+1', 'stamina_cost': 5},
+        {'id': 'show_work', 'text': '展示作品集', 'effect': '审美+1', 'stamina_cost': 8},
+        {'id': 'ask_referral', 'text': '请求内推机会', 'effect': '商业+1', 'stamina_cost': 10},
+    ],
+    '竞争对手': [
+        {'id': 'observe', 'text': '观察对方动态', 'effect': '商业+1', 'stamina_cost': 3},
+        {'id': 'compete', 'text': '主动竞争', 'effect': '执行+1 审美-1', 'stamina_cost': 12},
+        {'id': 'collaborate', 'text': '寻求合作可能', 'effect': '表达+1', 'stamina_cost': 8},
+    ],
+    '甲方/客户': [
+        {'id': 'pitch', 'text': '主动提案', 'effect': '商业+1', 'stamina_cost': 10},
+        {'id': 'feedback', 'text': '收集反馈', 'effect': '审美+1', 'stamina_cost': 5},
+        {'id': 'maintain', 'text': '维护关系', 'effect': '表达+1', 'stamina_cost': 6},
+    ],
+    '合作者/搭档': [
+        {'id': 'brainstorm', 'text': '头脑风暴', 'effect': '创意+1', 'stamina_cost': 8},
+        {'id': 'divide_work', 'text': '分工协作', 'effect': '执行+1', 'stamina_cost': 6},
+        {'id': 'social', 'text': '社交闲聊', 'effect': '精力+10', 'stamina_cost': -10},
+    ],
+    '行业暗流': [
+        {'id': 'gossip', 'text': '打听内幕', 'effect': '商业+1', 'stamina_cost': 5},
+        {'id': 'caution', 'text': '保持距离', 'effect': '无变化', 'stamina_cost': 0},
+        {'id': 'confront', 'text': '正面交锋', 'effect': '执行+1 表达-1', 'stamina_cost': 12},
+    ],
+    '职场关系': [
+        {'id': 'chat', 'text': '日常闲聊', 'effect': '精力+5', 'stamina_cost': -5},
+        {'id': 'help', 'text': '提供帮助', 'effect': '表达+1', 'stamina_cost': 8},
+        {'id': 'network', 'text': '拓展人脉', 'effect': '商业+1', 'stamina_cost': 10},
+    ],
+}
+
+@app.route('/api/npc/interact', methods=['POST'])
+def api_npc_interact():
+    state = load_state()
+    if not state:
+        return jsonify({'error': '没有存档'}), 404
+    data = request.get_json()
+    npc_id = data.get('npc_id')
+    action_id = data.get('action_id')
+    npcs = state.get('npcs', [])
+    npc = next((n for n in npcs if n.get('id') == npc_id), None)
+    if not npc:
+        return jsonify({'error': 'NPC 不存在'}), 404
+    role = npc.get('role', '职场关系')
+    interactions = NPC_INTERACTIONS.get(role, NPC_INTERACTIONS['职场关系'])
+    action = next((a for a in interactions if a['id'] == action_id), None)
+    if not action:
+        return jsonify({'error': '无效的互动'}), 400
+    stamina = state.get('stamina', 80)
+    cost = action['stamina_cost']
+    if stamina < cost:
+        return jsonify({'error': '精力不足'}), 400
+    state['stamina'] = max(0, min(100, stamina - cost))
+    effect = action['effect']
+    attrs = state.get('attributes', {})
+    if '审美+1' in effect:
+        attrs['审美判断力'] = min(10, attrs.get('审美判断力', 5) + 1)
+    if '执行+1' in effect:
+        attrs['执行能力'] = min(10, attrs.get('执行能力', 5) + 1)
+    if '商业+1' in effect:
+        attrs['商业思维'] = min(10, attrs.get('商业思维', 5) + 1)
+    if '表达+1' in effect:
+        attrs['表达能力'] = min(10, attrs.get('表达能力', 5) + 1)
+    if '创意+1' in effect:
+        attrs['创意深度'] = min(10, attrs.get('创意深度', 5) + 1)
+    if '审美-1' in effect:
+        attrs['审美判断力'] = max(1, attrs.get('审美判断力', 5) - 1)
+    if '执行-1' in effect:
+        attrs['执行能力'] = max(1, attrs.get('执行能力', 5) - 1)
+    if '表达-1' in effect:
+        attrs['表达能力'] = max(1, attrs.get('表达能力', 5) - 1)
+    state['attributes'] = attrs
+    if npc.get('relation') == '待剧情展开':
+        npc['relation'] = '已建立联系'
+    save_state(state)
+    return jsonify({
+        'ok': True,
+        'state': state,
+        'result': f'与{npc["name"]}互动: {action["text"]}',
+        'effect': effect
+    })
+
+@app.route('/api/npc/options', methods=['POST'])
+def api_npc_options():
+    state = load_state()
+    if not state:
+        return jsonify({'error': '没有存档'}), 404
+    data = request.get_json()
+    npc_id = data.get('npc_id')
+    npcs = state.get('npcs', [])
+    npc = next((n for n in npcs if n.get('id') == npc_id), None)
+    if not npc:
+        return jsonify({'error': 'NPC 不存在'}), 404
+    role = npc.get('role', '职场关系')
+    interactions = NPC_INTERACTIONS.get(role, NPC_INTERACTIONS['职场关系'])
+    stamina = state.get('stamina', 80)
+    options = []
+    for a in interactions:
+        opt = dict(a)
+        opt['available'] = stamina >= a['stamina_cost']
+        options.append(opt)
+    return jsonify({'ok': True, 'npc': npc, 'options': options})
+
+# ============================================================
 # I4-P0: Project System
 # ============================================================
 @app.route('/api/project', methods=['GET'])
