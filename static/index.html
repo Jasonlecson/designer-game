@@ -1,0 +1,565 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>平面设计师模拟器 · 职业生涯版</title>
+<style>
+:root {
+  --bg: #f5f3f0; --bg2: #ffffff; --sidebar: #1a1a24;
+  --card: #ffffff; --card-hover: #faf9f8; --border: #e8e5e0;
+  --text: #2c2c2c; --text2: #888888; --text3: #b0b0b0;
+  --accent: #e84a3d; --accent2: #d4a853; --green: #3d9e6c; --blue: #4a90d9;
+  --red: #e84a3d; --yellow: #e8b73d; --purple: #7c5cbf;
+  --radius: 10px; --radius-sm: 6px;
+  --shadow: 0 2px 12px rgba(0,0,0,0.06); --shadow-lg: 0 8px 32px rgba(0,0,0,0.1);
+  --font: 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', 'Noto Sans SC', sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', 'Consolas', 'PingFang SC', monospace;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: var(--font); background: #eae6e1; color: var(--text);
+  height: 100vh; overflow: hidden;
+}
+#app {
+  display: flex; height: 100vh;
+}
+
+/* ===== SIDEBAR ===== */
+#sidebar {
+  width: 220px; min-width: 220px; background: var(--sidebar);
+  display: flex; flex-direction: column; color: #c8c8d0;
+  border-right: 1px solid rgba(255,255,255,0.05);
+}
+.side-header { padding: 22px 18px 14px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+.side-header .logo { font-size: 1.05em; font-weight: 700; color: #fff; letter-spacing: 1px; }
+.side-header .logo span { display: block; font-size: 0.65em; color: var(--accent2); font-weight: 400; margin-top: 2px; }
+.side-header .status { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 0.72em; }
+.side-header .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--green); }
+.side-nav { flex: 1; padding: 12px 0; }
+.side-nav .nav-item {
+  display: flex; align-items: center; gap: 10px; padding: 10px 18px;
+  font-size: 0.85em; cursor: pointer; transition: all 0.2s;
+  border-left: 3px solid transparent; color: #a0a0b0;
+}
+.side-nav .nav-item:hover { background: rgba(255,255,255,0.04); color: #e0e0e0; }
+.side-nav .nav-item.active { border-left-color: var(--accent); background: rgba(232,74,61,0.1); color: #fff; }
+.side-nav .nav-icon { font-size: 1.15em; width: 22px; text-align: center; }
+.side-footer { padding: 14px 18px; border-top: 1px solid rgba(255,255,255,0.06); }
+.side-footer .btn { width: 100%; }
+
+/* ===== MAIN ===== */
+#main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+
+/* ===== TOP BAR ===== */
+#topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 24px; background: var(--bg2); border-bottom: 1px solid var(--border);
+}
+#topbar .breadcrumb { font-size: 0.82em; color: var(--text2); }
+#topbar .breadcrumb strong { color: var(--text); }
+#topbar .quick-stats { display: flex; gap: 18px; font-size: 0.8em; }
+.quick-stat { text-align: center; }
+.quick-stat .qs-val { font-size: 1.3em; font-weight: 700; color: var(--accent); }
+.quick-stat .qs-label { font-size: 0.75em; color: var(--text2); }
+
+/* ===== CONTENT AREA ===== */
+#content { flex: 1; overflow-y: auto; padding: 24px; display: flex; flex-direction: column; gap: 20px; }
+
+/* Page panels */
+.page { display: none; flex-direction: column; gap: 20px; }
+.page.active { display: flex; }
+
+/* ===== CARDS ===== */
+.card {
+  background: var(--card); border-radius: var(--radius);
+  border: 1px solid var(--border); box-shadow: var(--shadow);
+}
+.card-header {
+  padding: 14px 20px; border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.card-header .card-title { font-size: 0.9em; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+.card-header .card-badge { font-size: 0.7em; padding: 3px 10px; border-radius: 12px; background: var(--accent); color: #fff; }
+.card-body { padding: 18px 20px; }
+.card-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+.card-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
+
+/* ===== STAT CARDS ===== */
+.stat-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 18px 22px; box-shadow: var(--shadow);
+  display: flex; align-items: center; gap: 16px;
+}
+.stat-card .stat-icon { font-size: 2em; width: 50px; text-align: center; }
+.stat-card .stat-info { flex: 1; }
+.stat-card .stat-label { font-size: 0.78em; color: var(--text2); margin-bottom: 2px; }
+.stat-card .stat-value { font-size: 2.2em; font-weight: 800; line-height: 1; }
+.stat-card .stat-bar { height: 6px; background: #e8e5e0; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.stat-card .stat-fill { height: 100%; border-radius: 3px; transition: width 0.6s; }
+.stat-card .stat-sub { font-size: 0.72em; color: var(--text2); margin-top: 4px; }
+
+/* ===== EVENT CARD ===== */
+.event-card {
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius);
+  box-shadow: var(--shadow); overflow: hidden;
+}
+.event-card .event-header {
+  padding: 14px 20px; background: #faf8f5;
+  border-bottom: 1px solid var(--border);
+  display: flex; justify-content: space-between; align-items: center;
+}
+.event-card .event-tag {
+  font-size: 0.72em; padding: 3px 10px; border-radius: 12px;
+  font-weight: 500; letter-spacing: 0.5px;
+}
+.event-card .event-tag.green { background: #e6f4ea; color: var(--green); }
+.event-card .event-tag.red { background: #fde8e7; color: var(--red); }
+.event-card .event-tag.yellow { background: #fef7e0; color: var(--yellow); }
+.event-card .event-tag.blue { background: #e8f0fe; color: var(--blue); }
+.event-card .event-body { padding: 18px 20px; font-size: 0.92em; line-height: 1.9; }
+.event-card .event-choices { padding: 0 20px 16px; display: flex; gap: 10px; flex-wrap: wrap; }
+.event-card .event-date { font-size: 0.75em; color: var(--text3); }
+
+/* ===== CHOICE BUTTON ===== */
+.choice-btn {
+  flex: 1; min-width: 160px; padding: 14px 18px;
+  background: #faf8f5; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  cursor: pointer; font-family: var(--font); font-size: 0.85em;
+  text-align: left; transition: all 0.2s;
+}
+.choice-btn:hover:not(:disabled) {
+  border-color: var(--accent); background: #fef5f4;
+  transform: translateY(-1px); box-shadow: 0 4px 12px rgba(232,74,61,0.08);
+}
+.choice-btn .ch-id { font-size: 0.68em; color: var(--accent); font-weight: 700; margin-bottom: 3px; }
+.choice-btn .ch-text { color: var(--text); font-weight: 500; }
+.choice-btn .ch-hint { font-size: 0.72em; color: var(--text2); margin-top: 5px; }
+.choice-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+/* ===== NPC CARDS ===== */
+.npc-row { display: flex; gap: 10px; flex-wrap: wrap; }
+.npc-card {
+  flex: 1; min-width: 160px; max-width: 200px;
+  background: var(--card); border: 1px solid var(--border); border-radius: var(--radius-sm);
+  padding: 14px 16px; box-shadow: var(--shadow);
+}
+.npc-card .npc-avatar {
+  width: 40px; height: 40px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 1.2em; margin-bottom: 8px;
+}
+.npc-card .npc-name { font-weight: 600; font-size: 0.88em; }
+.npc-card .npc-role { font-size: 0.75em; color: var(--text2); margin: 2px 0; }
+.npc-card .npc-rel { font-size: 0.72em; color: var(--accent2); }
+
+/* ===== PROJECT TIMELINE ===== */
+.timeline { display: flex; align-items: center; gap: 0; padding: 8px 0; }
+.timeline-step { flex: 1; text-align: center; position: relative; }
+.timeline-step::after {
+  content: ''; position: absolute; top: 14px; left: 55%; width: 90%; height: 3px;
+  background: #e8e5e0; z-index: 0;
+}
+.timeline-step:last-child::after { display: none; }
+.timeline-step .step-dot {
+  width: 28px; height: 28px; border-radius: 50%; margin: 0 auto 8px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 0.75em; position: relative; z-index: 1;
+  border: 2px solid #e8e5e0; background: #fff;
+}
+.timeline-step.done .step-dot { background: var(--green); border-color: var(--green); color: #fff; }
+.timeline-step.current .step-dot { background: var(--accent2); border-color: var(--accent2); color: #fff; box-shadow: 0 0 0 4px rgba(212,168,83,0.2); }
+.timeline-step .step-label { font-size: 0.7em; color: var(--text2); }
+.timeline-step.current .step-label { color: var(--text); font-weight: 600; }
+
+/* ===== COVER PAGE ===== */
+#cover {
+  flex: 1; display: flex; flex-direction: column;
+  align-items: center; justify-content: center; background: #fff;
+  position: relative; min-height: 100vh;
+}
+#cover .cover-bg {
+  position: absolute; inset: 0;
+  background: radial-gradient(circle at 20% 30%, #fef7e0 0%, transparent 40%),
+              radial-gradient(circle at 75% 70%, #fde8e7 0%, transparent 40%);
+  opacity: 0.6;
+}
+#cover h1 { font-size: 3em; font-weight: 800; color: var(--accent); z-index: 1; letter-spacing: 3px; }
+#cover h1 span { display: block; font-size: 0.4em; color: var(--text2); font-weight: 400; margin-top: 6px; letter-spacing: 2px; }
+#cover .subtitle { color: var(--text2); margin: 16px 0; z-index: 1; font-size: 0.9em; }
+#cover .btn-row { display: flex; gap: 12px; z-index: 1; margin-top: 24px; }
+
+/* ===== CREATE PAGE ===== */
+#create-page {
+  flex: 1; display: none; flex-direction: column; align-items: center; justify-content: center;
+  background: #fff; overflow-y: auto; padding: 40px 20px;
+}
+#create-page .create-container { max-width: 600px; width: 100%; }
+#create-page h2 { font-size: 1.5em; color: var(--accent); margin-bottom: 6px; }
+#create-page .progress-bar {
+  height: 3px; background: #e8e5e0; border-radius: 2px; margin: 16px 0 28px;
+}
+#create-page .progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width 0.3s; }
+.create-step { display: none; animation: fadeSlide 0.35s; }
+.create-step.active { display: block; }
+@keyframes fadeSlide { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+.form-group { margin-bottom: 14px; }
+.form-group label { display: block; margin-bottom: 4px; font-weight: 600; font-size: 0.85em; color: var(--text); }
+.form-group input {
+  width: 100%; padding: 10px 14px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  font-size: 0.9em; font-family: var(--font); background: #faf8f5;
+}
+.form-group input:focus { border-color: var(--accent); outline: none; background: #fff; }
+.origin-card {
+  padding: 12px 16px; border: 1px solid var(--border); border-radius: var(--radius-sm);
+  margin: 4px 0; cursor: pointer; transition: all 0.15s; background: #faf8f5;
+}
+.origin-card:hover { border-color: var(--accent2); background: #fef7e0; }
+.origin-card.selected { border-color: var(--accent); background: #fef5f4; }
+.origin-card .title { font-weight: 600; font-size: 0.9em; }
+.origin-card .desc { font-size: 0.8em; color: var(--text2); margin-top: 2px; }
+.origin-card .meta { font-size: 0.75em; color: var(--green); margin-top: 3px; }
+.step-nav { display: flex; gap: 10px; margin-top: 20px; }
+
+/* ===== BUTTONS ===== */
+.btn {
+  padding: 10px 24px; border: none; border-radius: var(--radius-sm);
+  font-size: 0.88em; cursor: pointer; font-family: var(--font); transition: all 0.15s; font-weight: 500;
+}
+.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary:hover { background: #d43a2f; }
+.btn-secondary { background: #fff; color: var(--text); border: 1px solid var(--border); }
+.btn-secondary:hover { border-color: var(--accent); background: #fef5f4; }
+.btn-sm { padding: 5px 14px; font-size: 0.78em; }
+.btn-icon { display: inline-flex; align-items: center; gap: 6px; }
+
+/* ===== MODAL ===== */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: none; align-items: center; justify-content: center; z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+.modal {
+  background: #fff; padding: 28px; border-radius: var(--radius);
+  max-width: 420px; width: 90%; box-shadow: var(--shadow-lg);
+}
+.modal h3 { margin-bottom: 14px; color: var(--accent); }
+.modal .form-group { margin-bottom: 10px; }
+.modal .form-group label { font-size: 0.82em; display: block; margin-bottom: 3px; }
+.modal .form-group input {
+  width: 100%; padding: 8px 12px; border: 1px solid var(--border);
+  border-radius: var(--radius-sm); font-family: var(--font); background: #faf8f5;
+}
+.modal .btn-row { display: flex; gap: 8px; justify-content: flex-end; margin-top: 14px; }
+
+/* ===== END SCREEN ===== */
+#end-screen {
+  flex: 1; display: none; align-items: center; justify-content: center; flex-direction: column;
+  background: #fff; padding: 40px;
+}
+#end-screen h2 { font-size: 2em; margin: 16px 0; }
+#end-screen .end-text { max-width: 480px; text-align: center; line-height: 1.8; color: var(--text2); }
+#end-screen.he h2 { color: var(--green); }
+#end-screen.be h2 { color: var(--red); }
+
+/* ===== SCROLL ===== */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #d0d0d0; border-radius: 3px; }
+
+/* ===== LOADING ===== */
+.loading { text-align: center; padding: 20px; color: var(--text2); font-size: 0.85em; }
+.loading-pulse { display: inline-block; width: 12px; height: 12px; border-radius: 50%; background: var(--accent2); animation: pulse 1s ease infinite; }
+@keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.4; transform: scale(0.8); } }
+</style>
+</head>
+<body>
+
+<div id="app">
+
+<!-- SIDEBAR (game mode only) -->
+<div id="sidebar" style="display:none">
+  <div class="side-header">
+    <div class="logo">STUDIO<span>设计师生涯管理</span></div>
+    <div class="status"><span class="status-dot"></span> <span id="side-player">—</span></div>
+  </div>
+  <div class="side-nav">
+    <div class="nav-item active" data-page="dashboard" onclick="switchPage('dashboard')"><span class="nav-icon">📊</span> 工作台</div>
+    <div class="nav-item" data-page="projects" onclick="switchPage('projects')"><span class="nav-icon">📋</span> 项目</div>
+    <div class="nav-item" data-page="network" onclick="switchPage('network')"><span class="nav-icon">👥</span> 人脉</div>
+    <div class="nav-item" data-page="profile" onclick="switchPage('profile')"><span class="nav-icon">📁</span> 档案</div>
+    <div class="nav-item" onclick="showConfig()"><span class="nav-icon">⚙️</span> 设置</div>
+  </div>
+  <div class="side-footer">
+    <button class="btn btn-sm btn-secondary" style="width:100%;color:#a0a0b0;border-color:rgba(255,255,255,0.1)" onclick="resetGame()">结束当前游戏</button>
+  </div>
+</div>
+
+<!-- MAIN AREA -->
+<div id="main" style="flex:1;display:flex;flex-direction:column;overflow:hidden">
+
+<!-- COVER -->
+<div id="cover">
+  <div class="cover-bg"></div>
+  <h1>平面设计师模拟器<span>职业生涯定向版</span></h1>
+  <p class="subtitle">管理你的设计师生涯：接项目、做决策、建立声誉</p>
+  <div class="btn-row">
+    <button class="btn btn-primary btn-icon" onclick="showCreate()">🎮 开始新的职业生涯</button>
+    <button class="btn btn-secondary" onclick="showConfig()">⚙️ API 配置</button>
+    <button class="btn btn-secondary" onclick="loadGame()">📂 继续上次存档</button>
+  </div>
+</div>
+
+<!-- CREATE -->
+<div id="create-page">
+  <div class="create-container">
+    <h2>✦ 创建你的设计师身份</h2>
+    <div class="progress-bar"><div class="progress-fill" id="create-progress" style="width:0%"></div></div>
+    <div id="create-steps"></div>
+  </div>
+</div>
+
+<!-- GAME DASHBOARD -->
+<div id="game-screen" style="display:none;flex:1;flex-direction:column;overflow:hidden">
+  <div id="topbar">
+    <div class="breadcrumb">STUDIO / <strong id="tb-page">工作台</strong></div>
+    <div class="quick-stats">
+      <div class="quick-stat"><div class="qs-val" id="qs-turn">1</div><div class="qs-label">回合</div></div>
+      <div class="quick-stat"><div class="qs-val" id="qs-credit">5</div><div class="qs-label">行业信用</div></div>
+      <div class="quick-stat"><div class="qs-val" id="qs-portfolio">1</div><div class="qs-label">作品集</div></div>
+      <div class="quick-stat"><div class="qs-val" id="qs-stress">6</div><div class="qs-label">抗压</div></div>
+    </div>
+  </div>
+  <div id="content">
+    <!-- DASHBOARD PAGE -->
+    <div class="page active" id="page-dashboard">
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-header"><span class="card-title">📊 核心属性</span></div>
+          <div class="card-body" id="dash-attrs"></div>
+        </div>
+        <div class="card">
+          <div class="card-header"><span class="card-title">📋 当前状态</span><span class="card-badge" id="dash-tag">日常</span></div>
+          <div class="card-body" id="dash-current"></div>
+        </div>
+      </div>
+      <div class="card" id="event-area">
+        <div class="card-header"><span class="card-title">📌 最新动态</span><span class="event-date" id="event-date"></span></div>
+        <div class="event-body" id="event-narrative"></div>
+        <div class="event-choices" id="event-choices"></div>
+      </div>
+    </div>
+    <!-- PROJECTS PAGE -->
+    <div class="page" id="page-projects">
+      <div class="card"><div class="card-header"><span class="card-title">📋 项目时间线</span></div><div class="card-body" id="project-timeline"><span style="color:var(--text2)">暂无进行中的项目</span></div></div>
+      <div class="card"><div class="card-header"><span class="card-title">📦 作品集</span></div><div class="card-body" id="portfolio-list"><span style="color:var(--text2)">还没有完成的项目</span></div></div>
+    </div>
+    <!-- NETWORK PAGE -->
+    <div class="page" id="page-network">
+      <div class="card"><div class="card-header"><span class="card-title">👥 人脉网络</span></div><div class="card-body"><div class="npc-row" id="npc-grid"></div></div></div>
+    </div>
+    <!-- PROFILE PAGE -->
+    <div class="page" id="page-profile">
+      <div class="card"><div class="card-header"><span class="card-title">📁 设计师档案</span></div><div class="card-body" id="profile-content"></div></div>
+    </div>
+  </div>
+</div>
+
+<!-- END -->
+<div id="end-screen">
+  <h2 id="end-title"></h2>
+  <p class="end-text" id="end-text"></p>
+  <button class="btn btn-primary" onclick="resetGame()">重新开始</button>
+</div>
+
+</div><!-- /main -->
+</div><!-- /app -->
+
+<!-- Config Modal -->
+<div class="modal-overlay" id="config-modal">
+  <div class="modal">
+    <h3>⚙️ API 配置</h3>
+    <div class="form-group"><label>API Base URL</label><input id="cfg-api-base" placeholder="https://api.openai.com/v1"></div>
+    <div class="form-group"><label>API Key</label><input id="cfg-api-key" type="password" placeholder="sk-..."></div>
+    <div class="form-group"><label>模型</label><input id="cfg-model" placeholder="gpt-4o-mini"></div>
+    <div class="btn-row">
+      <button class="btn btn-secondary" onclick="hideConfig()">取消</button>
+      <button class="btn btn-primary" onclick="saveConfig()">保存</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ============ STATE ============
+let gameState = null, currentPlayer = {name:'', age:'24', city:'上海'};
+let createStep = 0, selections = {origin:'A', resources:'A', goal:'A', pace:'A'};
+let isProcessing = false, currentPage = 'dashboard';
+
+const avatarColors = ['#e84a3d','#4a90d9','#3d9e6c','#7c5cbf','#e8b73d','#e8679e'];
+const ORIGINS=[{id:'A',title:'设计专业应届生',desc:'刚从美院毕业，作品集薄薄一册，满腔热血但未经市场检验。',meta:'优势: 可塑性强 | 劣势: 零资源'},{id:'B',title:'乙方设计公司执行',desc:'做了1-3年执行，改稿赶deadline是日常。',meta:'优势: 熟悉全流程 | 劣势: 缺乏主导权'},{id:'C',title:'甲方品牌部设计师',desc:'在品牌公司内部团队工作，稳定但天花板明显。',meta:'优势: 商业视角 | 劣势: 创意空间有限'},{id:'D',title:'设计媒体编辑',desc:'采访设计师、写行业报道，了解全貌但不产出作品。',meta:'优势: 信息和人脉 | 劣势: 转型成本极高'},{id:'E',title:'自由职业设计师',desc:'接散活维持生计，自由度高但不稳定。',meta:'优势: 成长快 | 劣势: 收入不稳'},{id:'F',title:'印刷厂/材料商',desc:'比设计师更懂落地，但名字不会出现在作品上。',meta:'优势: 工艺知识 | 劣势: 需证明创作力'},{id:'G',title:'自定义身份',desc:'自行设定职业与入行背景。',meta:''}];
+const RESOURCES=[{id:'A',title:'零资源白手起家',desc:'没有任何人脉和推荐。'},{id:'B',title:'有行业引路人',desc:'有前辈愿意给一次机会。'},{id:'C',title:'有基础人脉',desc:'认识一些人，需要作品证明自己。'},{id:'D',title:'背负关系债',desc:'通过关系获得入行机会。'}];
+const GOALS=[{id:'A',title:'成为顶级独立设计师',desc:'拥有自己的工作室和个人品牌。'},{id:'B',title:'做到创意总监/合伙人',desc:'晋升到决策层。'},{id:'C',title:'创立设计品牌/厂牌',desc:'创造属于自己的产品。'},{id:'D',title:'成为行业话语权者',desc:'评委、导师、意见领袖。'},{id:'E',title:'活着就好',desc:'先站稳脚跟。'}];
+const PACES=[{id:'A',title:'慢热型（推荐）',desc:'细节丰富，成长可感知。'},{id:'B',title:'标准型',desc:'节奏更快，项目迭代更多。'},{id:'C',title:'快进型',desc:'跳跃式推进，快速体验。'}];
+const STEPS=['基本信息','职业起点','资源背景','职业目标','叙事节奏'];
+
+// ============ SCREENS ============
+function showCover(){document.getElementById('cover').style.display='flex';document.getElementById('create-page').style.display='none';document.getElementById('game-screen').style.display='none';document.getElementById('end-screen').style.display='none';document.getElementById('sidebar').style.display='none';}
+function showCreate(){document.getElementById('cover').style.display='none';document.getElementById('create-page').style.display='flex';document.getElementById('game-screen').style.display='none';document.getElementById('sidebar').style.display='none';createStep=0;selections={origin:'A',resources:'A',goal:'A',pace:'A'};currentPlayer={name:'',age:'24',city:'上海'};renderCreateStep();}
+function showGame(){document.getElementById('cover').style.display='none';document.getElementById('create-page').style.display='none';document.getElementById('game-screen').style.display='flex';document.getElementById('sidebar').style.display='flex';document.getElementById('end-screen').style.display='none';}
+
+// ============ CONFIG ============
+async function showConfig(){document.getElementById('config-modal').style.display='flex';try{let r=await fetch('/api/config');let d=await r.json();document.getElementById('cfg-api-base').value=d.api_base||'';document.getElementById('cfg-api-key').value=d.has_key?'***':'';document.getElementById('cfg-model').value=d.model||'gpt-4o-mini';}catch(e){}}
+function hideConfig(){document.getElementById('config-modal').style.display='none';}
+async function saveConfig(){let d={api_base:document.getElementById('cfg-api-base').value,api_key:document.getElementById('cfg-api-key').value,model:document.getElementById('cfg-model').value};try{let r=await fetch('/api/config',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(d)});let j=await r.json();alert(j.ok?'已保存':'失败');hideConfig();}catch(e){alert('保存失败');}}
+
+// ============ CREATE ============
+function renderCreateStep(){
+  let c=document.getElementById('create-steps'),html='',pct=((createStep)/5)*100;
+  document.getElementById('create-progress').style.width=pct+'%';
+  if(createStep===0){html+=`<div class="create-step active"><div class="form-group"><label>你的名字</label><input id="p-name" value="${currentPlayer.name}" placeholder="输入你的名字"></div><div class="form-group"><label>年龄</label><input id="p-age" value="${currentPlayer.age}" placeholder="24"></div><div class="form-group"><label>所在城市</label><input id="p-city" value="${currentPlayer.city}" placeholder="上海"></div><div class="step-nav"><button class="btn btn-primary" onclick="nextStep()">下一步 ▶</button></div></div>`;}
+  else if(createStep===1){html+=`<div class="create-step active">`;ORIGINS.forEach(o=>{html+=`<div class="origin-card${selections.origin===o.id?' selected':''}" onclick="selectCard('origin','${o.id}')"><div class="title">${o.id}. ${o.title}</div><div class="desc">${o.desc}</div><div class="meta">${o.meta}</div></div>`;});html+=`<div style="margin-top:4px"><label style="font-size:0.8em;color:var(--text2)">自定义描述（仅选G需填）</label><input id="custom-origin" placeholder="描述你的职业" style="margin-top:2px;width:100%;padding:8px;border:1px solid var(--border);border-radius:6px;font-family:var(--font);background:#faf8f5"></div><div class="step-nav"><button class="btn btn-secondary" onclick="createStep=0;renderCreateStep()">◀</button><button class="btn btn-primary" onclick="nextStep()">下一步 ▶</button></div></div>`;}
+  else if(createStep===2){html+=`<div class="create-step active">`;RESOURCES.forEach(r=>{html+=`<div class="origin-card${selections.resources===r.id?' selected':''}" onclick="selectCard('resources','${r.id}')"><div class="title">${r.id}. ${r.title}</div><div class="desc">${r.desc}</div></div>`;});html+=`<div class="step-nav"><button class="btn btn-secondary" onclick="createStep=1;renderCreateStep()">◀</button><button class="btn btn-primary" onclick="nextStep()">下一步 ▶</button></div></div>`;}
+  else if(createStep===3){html+=`<div class="create-step active">`;GOALS.forEach(g=>{html+=`<div class="origin-card${selections.goal===g.id?' selected':''}" onclick="selectCard('goal','${g.id}')"><div class="title">${g.id}. ${g.title}</div><div class="desc">${g.desc}</div></div>`;});html+=`<div class="step-nav"><button class="btn btn-secondary" onclick="createStep=2;renderCreateStep()">◀</button><button class="btn btn-primary" onclick="nextStep()">下一步 ▶</button></div></div>`;}
+  else{html+=`<div class="create-step active">`;PACES.forEach(p=>{html+=`<div class="origin-card${selections.pace===p.id?' selected':''}" onclick="selectCard('pace','${p.id}')"><div class="title">${p.id}. ${p.title}</div><div class="desc">${p.desc}</div></div>`;});html+=`<div class="step-nav"><button class="btn btn-secondary" onclick="createStep=3;renderCreateStep()">◀</button><button class="btn btn-primary" onclick="startGame()">🎮 开始</button></div></div>`;}
+  c.innerHTML=html;}
+function selectCard(type,id){selections[type]=id;renderCreateStep();}
+function nextStep(){if(createStep===0){currentPlayer.name=document.getElementById('p-name').value||'林知夏';currentPlayer.age=document.getElementById('p-age').value||'24';currentPlayer.city=document.getElementById('p-city').value||'上海';}if(createStep===1){let ci=document.getElementById('custom-origin');if(ci)currentPlayer.custom_origin=ci.value;}createStep++;renderCreateStep();}
+
+// ============ GAME START/LOAD/RESET ============
+async function startGame(){
+  showGame(); switchPage('dashboard');
+  document.getElementById('event-narrative').innerHTML='<div class="loading"><span class="loading-pulse"></span> AI 正在生成你的设计师生涯...</div>';
+  document.getElementById('event-choices').innerHTML='';
+  isProcessing=true;
+  let data={...currentPlayer,...selections};
+  try{let ctrl=new AbortController(),t=setTimeout(()=>ctrl.abort(),120000);let r=await fetch('/api/new_game',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data),signal:ctrl.signal});clearTimeout(t);let d=await r.json();if(d.error){document.getElementById('event-narrative').innerHTML=`<div style="color:var(--red);text-align:center;padding:20px">❌ ${d.error}</div>`;isProcessing=false;return;}gameState=d.state;}catch(e){document.getElementById('event-narrative').innerHTML=`<div style="color:var(--red);text-align:center;padding:20px">❌ ${e.name==='AbortError'?'请求超时，请检查 API 配置':'连接失败: '+e.message}</div>`;}
+  isProcessing=false; renderAll();
+}
+async function loadGame(){try{let r=await fetch('/api/state');let d=await r.json();if(!d.state){alert('没有存档');return;}gameState=d.state;showGame();switchPage('dashboard');renderAll();}catch(e){alert('连接失败');}}
+async function resetGame(){try{await fetch('/api/reset',{method:'POST'});}catch(e){}gameState=null;showCover();}
+
+// ============ PAGE SWITCHING ============
+function switchPage(page){
+  currentPage=page;
+  document.querySelectorAll('#sidebar .nav-item').forEach(el=>el.classList.remove('active'));
+  document.querySelector(`#sidebar .nav-item[data-page="${page}"]`)?.classList.add('active');
+  document.querySelectorAll('.page').forEach(el=>el.classList.remove('active'));
+  let p=document.getElementById('page-'+page); if(p)p.classList.add('active');
+  document.getElementById('tb-page').textContent={'dashboard':'工作台','projects':'项目','network':'人脉','profile':'档案'}[page]||'工作台';
+  if(gameState) renderPage(page);
+}
+
+// ============ RENDER ALL ============
+function renderAll(){
+  if(!gameState)return;
+  let attrs=gameState.attributes||{}, player=gameState.player||{};
+  document.getElementById('side-player').textContent=player.name+' · '+player.origin;
+  document.getElementById('qs-turn').textContent=gameState.turn_count;
+  document.getElementById('qs-credit').textContent=attrs['行业信用']||5;
+  document.getElementById('qs-portfolio').textContent=attrs['作品集厚度']||1;
+  document.getElementById('qs-stress').textContent=attrs['抗压阈值']||6;
+  renderPage(currentPage);
+}
+
+function renderPage(page){
+  if(page==='dashboard') renderDashboard();
+  else if(page==='projects') renderProjects();
+  else if(page==='network') renderNetwork();
+  else if(page==='profile') renderProfile();
+}
+
+// ============ DASHBOARD ============
+function renderDashboard(){
+  let attrs=gameState.attributes||{}, log=gameState.story_log||[], last=log[log.length-1];
+
+  // Attributes panel
+  let attrHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">';
+  let icons={'审美判断力':'🎨','执行力':'🔧','商业理解力':'💼','表达与说服力':'🗣️','行业信用':'🤝','自主判断力':'🧭','作品集厚度':'📦','抗压阈值':'⚡'};
+  for(let[k,v]of Object.entries(attrs)){
+    let cls=v>=7?'var(--green)':v>=4?'var(--accent2)':'var(--red)';
+    attrHTML+=`<div style="padding:8px 0"><div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px"><span style="font-size:0.8em">${icons[k]||''} ${k}</span><span style="font-size:1.3em;font-weight:700;color:${cls}">${v}</span></div><div style="height:5px;background:#e8e5e0;border-radius:3px;overflow:hidden"><div style="height:100%;width:${v*10}%;background:${cls};border-radius:3px;transition:width 0.6s"></div></div></div>`;
+  }
+  attrHTML+='</div>';
+  document.getElementById('dash-attrs').innerHTML=attrHTML;
+
+  // Current state panel
+  let tag=last?.event_tag||'日常',tagCls={'项目推进':'green','行业事件':'blue','转折点':'yellow','倦怠预警':'red'}[tag]||'green';
+  document.getElementById('dash-tag').textContent=tag;
+  document.getElementById('dash-tag').style.background=tagCls==='green'?'#e6f4ea':tagCls==='blue'?'#e8f0fe':tagCls==='yellow'?'#fef7e0':'#fde8e7';
+  document.getElementById('dash-tag').style.color=tagCls==='green'?'var(--green)':tagCls==='blue'?'var(--blue)':tagCls==='yellow'?'var(--yellow)':'var(--red)';
+  document.getElementById('dash-current').innerHTML=`<div style="font-size:0.85em;color:var(--text2)">当前氛围</div><div style="font-size:1.1em;font-weight:600;margin-top:4px">${last?.atmosphere||'设计工作室的日常'}</div><div style="font-size:0.78em;color:var(--text2);margin-top:8px">回合 ${gameState.turn_count} · ${gameState.player?.city||'上海'}</div>`;
+
+  // Event area
+  document.getElementById('event-date').textContent=last?.atmosphere?'回合 '+gameState.turn_count:'';
+  document.getElementById('event-narrative').innerHTML=last?.narrative?`<div style="font-size:0.93em;line-height:1.9">${last.narrative}</div>`:'<div class="loading">等待 AI 生成...</div>';
+
+  let choiceHTML='';
+  if(gameState.phase==='playing'&&last&&last.choices&&last.choices.length>0){
+    last.choices.forEach(ch=>{choiceHTML+=`<button class="choice-btn" onclick="makeChoice('${ch.id}')" ${isProcessing?'disabled':''}><div class="ch-id">选项 ${ch.id}</div><div class="ch-text">${ch.text}</div><div class="ch-hint">${ch.hint||''}</div></button>`;});
+  }
+  document.getElementById('event-choices').innerHTML=choiceHTML;
+
+  // Ending
+  if(gameState.phase==='ended'&&gameState.ending){
+    let end=gameState.ending,screen=document.getElementById('end-screen');
+    screen.style.display='flex'; screen.className=end.type?.startsWith('he')?'he':'be';
+    document.getElementById('end-title').textContent=end.type==='he_breakthrough'?'🌟 顶级突破':'💀 生涯终结';
+    document.getElementById('end-text').textContent=end.text||'';
+  }
+
+  requestAnimationFrame(()=>{let el=document.getElementById('content');el.scrollTop=el.scrollHeight;});
+}
+
+// ============ PROJECTS ============
+function renderProjects(){
+  let log=gameState.story_log||[], attrs=gameState.attributes||{};
+  let html='<div style="font-size:0.85em;color:var(--text2)">作品集厚度: <strong style="color:var(--accent);font-size:1.2em">'+attrs['作品集厚度']+'</strong> / 10</div><br>';
+  html+='<div style="font-size:0.78em;color:var(--text2)">完成足够多的优质项目来提升作品集厚度。</div>';
+  document.getElementById('portfolio-list').innerHTML=html;
+
+  if(gameState.current_project){
+    let cp=gameState.current_project;
+    let timelineHTML='<div class="timeline">';
+    let phases=['需求分析','创意构思','内部评审','客户提案','修改迭代','最终交付'];
+    let prog=cp.progress||10,currentIdx=Math.floor(prog/(100/phases.length));
+    phases.forEach((ph,i)=>{let cls=i<currentIdx?'done':i===currentIdx?'current':'';timelineHTML+=`<div class="timeline-step ${cls}"><div class="step-dot">${i<currentIdx?'✓':i+1}</div><div class="step-label">${ph}</div></div>`;});
+    timelineHTML+='</div>';
+    document.getElementById('project-timeline').innerHTML=`<div style="margin-bottom:8px;font-weight:600">${cp.name||'进行中'}</div><div style="font-size:0.8em;color:var(--text2);margin-bottom:12px">阶段: ${cp.phase||'进行中'} · 进度: ${cp.progress||30}%</div>${timelineHTML}`;
+  }
+}
+
+// ============ NETWORK ============
+function renderNetwork(){
+  let npcs=gameState.npcs||[],html='';
+  npcs.slice(0,6).forEach((n,i)=>{html+=`<div class="npc-card"><div class="npc-avatar" style="background:${avatarColors[i]};color:#fff">${n.name[0]}</div><div class="npc-name">${n.name}</div><div class="npc-role">${n.role}</div><div class="npc-rel">${n.relation||'待展开'}</div></div>`;});
+  document.getElementById('npc-grid').innerHTML=html||'<span style="color:var(--text2)">暂无联系人</span>';
+}
+
+// ============ PROFILE ============
+function renderProfile(){
+  let p=gameState.player||{},a=gameState.attributes||{};
+  let html=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">`;
+  html+=`<div><div style="font-size:0.75em;color:var(--text2)">姓名</div><div style="font-weight:600">${p.name||'—'}</div></div>`;
+  html+=`<div><div style="font-size:0.75em;color:var(--text2)">年龄</div><div style="font-weight:600">${p.age||'—'}</div></div>`;
+  html+=`<div><div style="font-size:0.75em;color:var(--text2)">城市</div><div style="font-weight:600">${p.city||'上海'}</div></div>`;
+  html+=`<div><div style="font-size:0.75em;color:var(--text2)">职业</div><div style="font-weight:600">${p.origin||'—'}</div></div>`;
+  html+=`<div><div style="font-size:0.75em;color:var(--text2)">目标</div><div style="font-weight:600">${p.goal||'—'}</div></div>`;
+  html+=`<div><div style="font-size:0.75em;color:var(--text2)">资源</div><div style="font-weight:600">${p.resources||'—'}</div></div>`;
+  html+=`</div>`;
+  html+=`<hr style="border:none;border-top:1px solid var(--border);margin:16px 0">`;
+  html+=`<div style="font-size:0.8em;color:var(--text2)">回合数: ${gameState.turn_count} · 阶段: ${gameState.phase==='playing'?'进行中':'已结束'}</div>`;
+  document.getElementById('profile-content').innerHTML=html;
+}
+
+// ============ ACTION ============
+async function makeChoice(choiceId){
+  if(isProcessing)return;isProcessing=true;
+  document.getElementById('event-choices').innerHTML='<div class="loading"><span class="loading-pulse"></span> AI 生成中...</div>';
+  try{let ctrl=new AbortController(),t=setTimeout(()=>ctrl.abort(),120000);let r=await fetch('/api/action',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({choice_id:choiceId}),signal:ctrl.signal});clearTimeout(t);let d=await r.json();if(d.error){document.getElementById('event-choices').innerHTML=`<div style="color:var(--red);text-align:center;padding:10px">❌ ${d.error}</div>`;isProcessing=false;return;}if(d.entry)gameState.story_log.push(d.entry);if(d.attributes)gameState.attributes=d.attributes;if(d.phase)gameState.phase=d.phase;if(d.ending)gameState.ending=d.ending;if(d.turn)gameState.turn_count=d.turn;}catch(e){document.getElementById('event-choices').innerHTML=`<div style="color:var(--red);text-align:center;padding:10px">❌ ${e.name==='AbortError'?'超时':'失败: '+e.message}</div>`;}
+  isProcessing=false;renderAll();
+}
+
+showCover();
+</script>
+</body>
+</html>
