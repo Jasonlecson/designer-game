@@ -112,11 +112,22 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 你是本游戏的 DM，负责剧情推进、NPC 扮演、事件生成、职业属性结算。
 
 ## 核心基调
-- 写实向职业生涯模拟，非爽文，非恋爱向。
-- 女主不是天才，成长必须有代价、犹豫、自我怀疑。
-- 没有天降贵人。所有人脉、机会、信任都必须通过作品、判断力和职业信誉去挣。
+- 写实向职业生涯模拟，非爽文，非恋爱向。但**不能全程只有苦——生活有苦有甜，职业生涯也如此。**
+- 女主不是天才，成长必须有代价、犹豫、自我怀疑。但同样会有突破时刻、被认可的温暖、以及"选对了"的欣慰。
+- 没有天降贵人。但通过努力赢得的信任和尊重，应该在叙事中有清晰的正面反馈。
 - 叙事信息有限性：只描述第一视角所见所闻，不透露 NPC 隐藏意图。
 - 没有恋爱线。NPC 限于：同事、导师、竞争对手、甲方、合作者、行业前辈。
+
+## 基调平衡（IMPORTANT）
+每 3-4 回合至少有一个「正面时刻」——可以是：
+- 客户的一句真心认可，让你觉得加班值得
+- 同事主动帮忙，团队感温暖
+- 作品被同行点赞，在社交媒体上有了小传播
+- 拿到一笔意料之外的奖金
+- 完成一个项目后走在街上，感觉自己在成长
+- 一位前辈说了句让你受益匪浅的话
+
+不要让女主一直处于"苦熬"状态。挫折之后要有回弹，低谷之后要有光亮。职业生涯是马拉松，不是持续的泥潭。
 
 ## 核心属性（1-10分）
 审美判断力 — 视觉品味、风格把控、设计决策
@@ -1523,6 +1534,10 @@ def api_npc_interact():
     state = load_state()
     if not state:
         return jsonify({'error': '没有存档'}), 404
+    cfg = load_config()
+    if not cfg.get('api_key'):
+        return jsonify({'error': '请先配置 API Key'}), 400
+
     data = request.get_json()
     npc_id = data.get('npc_id')
     action_id = data.get('action_id')
@@ -1540,33 +1555,78 @@ def api_npc_interact():
     if stamina < cost:
         return jsonify({'error': '精力不足'}), 400
     state['stamina'] = max(0, min(100, stamina - cost))
+
+    # Apply deterministic attribute effects
     effect = action['effect']
     attrs = state.get('attributes', {})
-    if '审美+1' in effect:
-        attrs['审美判断力'] = min(10, attrs.get('审美判断力', 5) + 1)
-    if '执行+1' in effect:
-        attrs['执行能力'] = min(10, attrs.get('执行能力', 5) + 1)
-    if '商业+1' in effect:
-        attrs['商业思维'] = min(10, attrs.get('商业思维', 5) + 1)
-    if '表达+1' in effect:
-        attrs['表达能力'] = min(10, attrs.get('表达能力', 5) + 1)
-    if '创意+1' in effect:
-        attrs['创意深度'] = min(10, attrs.get('创意深度', 5) + 1)
-    if '审美-1' in effect:
-        attrs['审美判断力'] = max(1, attrs.get('审美判断力', 5) - 1)
-    if '执行-1' in effect:
-        attrs['执行能力'] = max(1, attrs.get('执行能力', 5) - 1)
-    if '表达-1' in effect:
-        attrs['表达能力'] = max(1, attrs.get('表达能力', 5) - 1)
+    for short, full in [('审美', '审美判断力'), ('执行', '执行能力'), ('商业', '商业思维'),
+                         ('表达', '表达能力'), ('创意', '创意深度')]:
+        if f'{short}+1' in effect:
+            attrs[full] = min(10, attrs.get(full, 5) + 1)
+        if f'{short}-1' in effect:
+            attrs[full] = max(1, attrs.get(full, 5) - 1)
     state['attributes'] = attrs
+
     if npc.get('relation') == '待剧情展开':
         npc['relation'] = '已建立联系'
+
+    # Advance turn and call LLM for narrative
+    turn = state['turn_count'] + 1
+    state['turn_count'] = turn
+
+    action_context = f'主动行动：与{npc["name"]}（{npc["role"]}）互动——{action["text"]}。{effect}'
+    messages = build_messages(state, action_context)
+    result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
+    if error:
+        result = validate_and_fix_result({}, state['turn_count'], state['attributes'])
+    result = validate_and_fix_result(result, state['turn_count'], state['attributes'])
+
+    if result.get('npc_updates'):
+        state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
+    if result.get('company_update'):
+        apply_company_update(state, result['company_update'])
+
+    entry = {
+        'turn': turn, 'player_action': f'与{npc["name"]}互动',
+        'narrative': result['narrative'], 'choices': result['choices'],
+        'atmosphere': result.get('atmosphere', '日常'),
+        'attr_display': state['attributes'].copy(),
+        'event_tag': result.get('event_tag', '日常'),
+    }
+    state['story_log'].append(entry)
+    state['attributes'] = result.get('attr_display', state['attributes'])
+
+    # Run all post-turn systems
+    arc_msg = detect_and_start_arc(state)
+    challenge = check_career_challenge(state)
+    economy_event = process_economy(state)
+    crisis_event = check_savings_crisis(state)
+    project_phase_hint = advance_project_phase(state)
+    prev_stamina = state.get('_prev_stamina', state.get('stamina', 80))
+    state['title'] = calculate_title(state['attributes'])
+    new_ach, unlocked = check_achievements(state, prev_stamina)
+    state['unlocked_achievements'] = list(unlocked)
+    state['_prev_stamina'] = state['stamina']
+    milestone_done, milestone_reward = check_milestone(state)
+    npc_event = generate_npc_event(state)
+    stamina_status, _ = get_stamina_status(state['stamina'])
+
     save_state(state)
     return jsonify({
-        'ok': True,
-        'state': state,
-        'result': f'与{npc["name"]}互动: {action["text"]}',
-        'effect': effect
+        'ok': True, 'entry': entry,
+        'attributes': state['attributes'], 'stamina': state['stamina'],
+        'savings': state['savings'], 'title': state['title'],
+        'npcs': state['npcs'], 'company': state.get('company', {}),
+        'career_history': state.get('career_history', []),
+        'unlocked_achievements': list(unlocked),
+        'new_achievements': [a for a in ACHIEVEMENTS if a['id'] in new_ach],
+        'milestone': state.get('milestone'),
+        'milestone_done': milestone_done, 'milestone_reward': milestone_reward,
+        'economy_event': economy_event, 'crisis_event': crisis_event,
+        'arc_msg': arc_msg, 'project_phase_hint': project_phase_hint,
+        'challenge': challenge, 'npc_event': npc_event,
+        'stamina_status': stamina_status, 'trait': state.get('trait'),
+        'turn': turn, 'effect': effect
     })
 
 @app.route('/api/npc/options', methods=['POST'])

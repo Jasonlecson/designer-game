@@ -1828,79 +1828,76 @@ async function doNPCInteraction(npcId, actionId) {
 // ============= PORTFOLIO TAB =============
 function renderPortfolio() {
   const attrs = gameState.attributes || {};
-  const player = gameState.player || {};
   const container = document.getElementById('portfolio-showcase');
-
-  let html = `<div class="portfolio-stat">
-    <div class="portfolio-stat-num">${attrs['作品集厚度'] || 0}</div>
-    <div>
-      <div style="font-weight:600;color:var(--text-primary)">作品集厚度</div>
-      <div class="portfolio-stat-label">完成更多优质项目来提升</div>
-      <div class="attr-bar" style="margin-top:8px;background:var(--surface-2)"><div class="attr-fill" style="width:${(attrs['作品集厚度']||0)*10}%;background:var(--accent-light)"></div></div>
-    </div>
-  </div>`;
-
-  html += `<div class="portfolio-stat">
-    <div class="portfolio-stat-num" style="color:var(--accent-light)">${attrs['创意深度'] || 0}</div>
-    <div>
-      <div style="font-weight:600;color:var(--text-primary)">创意深度</div>
-      <div class="portfolio-stat-label">概念思考与原创能力</div>
-      <div class="attr-bar" style="margin-top:8px;background:var(--surface-2)"><div class="attr-fill" style="width:${(attrs['创意深度']||0)*10}%;background:var(--accent-light)"></div></div>
-    </div>
-  </div>`;
-
   const log = gameState.story_log || [];
-  const projects = log.filter(e => e.event_tag === '项目推进');
+  const currentProj = gameState.current_project;
+  const company = gameState.company || {};
 
-  // Achievements section - F3: use API data
-  const unlockedAch = gameState.unlocked_achievements || [];
-  html += `<div style="margin:20px 0"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:12px">🏅 成就 (${unlockedAch.length}/12)</div>`;
-  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="achievements-grid"></div></div>`;
+  let html = '';
 
-  container.innerHTML = html;
-  // F3: Async load achievements from API
-  loadAchievementsGrid(unlockedAch);
+  // Portfolio header card
+  html += `<div style="background:var(--surface-card);border:1px solid var(--surface-2);border-radius:var(--radius-lg);padding:20px;margin-bottom:16px">
+    <div style="display:flex;gap:16px;align-items:flex-start">
+      <div style="width:64px;height:64px;border-radius:var(--radius);background:linear-gradient(135deg,var(--accent-light),var(--accent));display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <span style="font-size:1.6rem">📁</span>
+      </div>
+      <div style="min-width:0">
+        <div style="font-weight:700;font-size:1rem;color:var(--text-primary)">${esc((gameState.player||{}).name||'你')} 的作品集</div>
+        <div style="font-size:0.75rem;color:var(--text-secondary);margin-top:2px">${company.name ? esc(company.name) + ' · ' + esc(company.position||'设计师') : '独立设计师'}</div>
+        <div style="margin-top:8px;display:flex;gap:12px;font-size:0.72rem">
+          <span>📦 厚度 <b style="color:var(--accent)">${attrs['作品集厚度']||0}/10</b></span>
+          <span>💡 创意 <b style="color:var(--accent-light)">${attrs['创意深度']||0}/10</b></span>
+          <span>🎨 审美 <b style="color:var(--success)">${attrs['审美判断力']||0}/10</b></span>
+        </div>
+      </div>
+    </div>
+  </div>`;
 
-
-  // Career history
-  const history = gameState.career_history || [];
-  const currentCompany = gameState.company || {};
-  html += `<div style="margin:20px 0"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:12px">💼 职业生涯</div>`;
-
-  if (currentCompany.name) {
-    html += `<div style="padding:10px 14px;border-left:3px solid var(--accent);background:var(--accent-bg);border-radius:0 var(--radius-sm) var(--radius-sm) 0;margin-bottom:6px">
-      <div style="font-weight:600;font-size:0.85rem;color:var(--accent)">📍 当前</div>
-      <div style="font-size:0.8rem">${esc(currentCompany.name)} · ${esc(currentCompany.position || '设计师')}</div>
+  // Active project
+  if (currentProj && currentProj.phase !== '完成') {
+    const phaseColors = { '竞标':'#e8f0fe', '执行':'var(--accent-bg)', '改稿':'#fdf8e8', '交付':'#edf5ee' };
+    const phaseIcons = { '竞标':'📋', '执行':'⚡', '改稿':'🔄', '交付':'📤' };
+    const bg = phaseColors[currentProj.phase] || 'var(--surface-1)';
+    html += `<div style="background:${bg};border:1px solid var(--surface-2);border-radius:var(--radius);padding:16px;margin-bottom:16px">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <span style="font-weight:600;font-size:0.85rem">${phaseIcons[currentProj.phase]||''} 进行中：${esc(currentProj.name||'未名项目')}</span>
+        <span style="font-size:0.7rem;color:var(--text-tertiary)">${esc(currentProj.phase)} · 预算 ${(currentProj.budget||0)/1000}k</span>
+      </div>
+      <div style="display:flex;gap:12px;font-size:0.72rem;color:var(--text-secondary)">
+        <span>质量 ${currentProj.quality||0}/100</span><span>客户满意度 ${currentProj.client_satisfaction||50}/100</span>
+      </div>
     </div>`;
   }
 
-  history.slice().reverse().forEach(h => {
-    html += `<div style="padding:8px 14px;border-left:3px solid var(--surface-3);margin-bottom:4px">
-      <div style="font-size:0.7rem;color:var(--text-tertiary)">第${h.turn||'?'} - ${h.left_at_turn||'?'} 回合</div>
-      <div style="font-size:0.8rem;color:var(--text-secondary)">${esc(h.name || '—')} · ${esc(h.position || '—')}</div>
-    </div>`;
-  });
-
-  if (!currentCompany.name && history.length === 0) {
-    html += `<div style="font-size:0.75rem;color:var(--text-tertiary);padding:8px">职业生涯即将展开</div>`;
-  }
-  html += `</div>`;
-
-  // Projects
-  if (projects.length > 0) {
-    html += `<div style="margin-top:16px"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:10px">已完成项目</div>`;
-    projects.forEach(e => {
-      html += `<div style="padding:10px 14px;border:1px solid var(--surface-2);border-radius:var(--radius);margin-bottom:6px;font-size:0.82rem">
-        <span style="font-weight:600">T${e.turn}</span>
-        <span style="color:var(--text-secondary);margin-left:8px">${esc((e.narrative||'').replace(/<[^>]*>/g,'').substring(0,80))}…</span>
+  // Completed projects as visual cards
+  const completedProjects = log.filter(e => e.event_tag === '项目推进');
+  if (completedProjects.length > 0) {
+    html += `<div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:10px">✨ 已完成作品</div>`;
+    html += `<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px">`;
+    completedProjects.slice(-6).reverse().forEach((e, i) => {
+      const text = (e.narrative||'').replace(/<[^>]*>/g,'');
+      const name = text.substring(0, 24) || '设计项目';
+      const preview = text.substring(0, 50) || '项目详情';
+      const turn = e.turn || 0;
+      const colors = ['var(--accent)', 'var(--success)', '#7b8fa1', '#c4a43e', '#8e6b9e', '#c4755e'];
+      html += `<div style="border:1px solid var(--surface-2);border-radius:var(--radius);padding:12px;background:var(--surface-card)">
+        <div style="width:100%;height:60px;border-radius:var(--radius-sm);margin-bottom:8px;background:linear-gradient(135deg,${colors[i%6]}22,${colors[(i+1)%6]}11);display:flex;align-items:center;justify-content:center;font-size:1.2rem">🖼️</div>
+        <div style="font-weight:600;font-size:0.8rem;color:var(--text-primary)">${esc(name)}…</div>
+        <div style="font-size:0.68rem;color:var(--text-tertiary);margin-top:2px">T${turn} · ${esc(preview.substring(0,30))}…</div>
       </div>`;
     });
     html += `</div>`;
   } else {
-    html += `<div class="portfolio-placeholder">🎨 还没有完成的项目<br><span style="font-size:0.75rem">推进到第 5 回合后将开始积累作品</span></div>`;
+    html += `<div class="portfolio-placeholder" style="margin-bottom:16px">🎨 还没有完成的作品<br><span style="font-size:0.75rem">完成项目后作品会出现在这里</span></div>`;
   }
 
+  // Achievements
+  const unlockedAch = gameState.unlocked_achievements || [];
+  html += `<div style="margin-top:4px"><div style="font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:10px">🏅 成就 (${unlockedAch.length}/12)</div>`;
+  html += `<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="achievements-grid"></div></div>`;
+
   container.innerHTML = html;
+  loadAchievementsGrid(unlockedAch);
 }
 
 // ============= ACTION =============
