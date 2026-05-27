@@ -1687,6 +1687,51 @@ def api_project():
     return jsonify({'project': proj, 'turns_left': max(0, turns_left)})
 
 # ============================================================
+# Portfolio Generator — LLM生成作品集条目
+# ============================================================
+@app.route('/api/portfolio/generate', methods=['POST'])
+def api_portfolio_generate():
+    state = load_state()
+    if not state:
+        return jsonify({'error': '没有存档'}), 404
+    cfg = load_config()
+    if not cfg.get('api_key'):
+        return jsonify({'error': '请先配置 API Key'}), 400
+
+    log = state.get('story_log', [])
+    projects = log[-8:]  # Last 8 entries
+    project_entries = [e for e in projects if e.get('event_tag') == '项目推进']
+
+    if not project_entries:
+        return jsonify({'entries': [], 'message': '还没有完成的项目'})
+
+    # Build prompt with project narratives
+    project_text = '\n'.join([f'项目{i+1}（第{e["turn"]}回合）: {e.get("narrative","")[:200]}' for i, e in enumerate(project_entries)])
+    messages = [
+        {'role': 'system', 'content': '你是设计师的作品集编辑。根据项目叙述，为每个项目生成一个简洁的作品集条目。只输出JSON。'},
+        {'role': 'user', 'content': f'''根据以下项目经历，生成作品集条目。每个条目包含：name（项目名≤15字）、role（角色≤8字）、style（视觉风格≤10字）、highlight（一句话亮点≤20字）。
+
+{project_text}
+
+只输出JSON数组，格式：[{{"name":"","role":"","style":"","highlight":""}}, ...]'''}
+    ]
+    result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
+    if error:
+        return jsonify({'entries': [], 'message': '生成失败'})
+
+    try:
+        content = result if isinstance(result, list) else json.loads(result) if isinstance(result, str) else []
+        # Clean markdown
+        if isinstance(content, str):
+            content = content.replace('```json', '').replace('```', '').strip()
+            content = json.loads(content)
+        entries = content if isinstance(content, list) else []
+    except:
+        entries = []
+
+    return jsonify({'entries': entries})
+
+# ============================================================
 # I4-P1: Active Actions (non-LLM turns)
 # ============================================================
 ACTIVE_ACTIONS = {
