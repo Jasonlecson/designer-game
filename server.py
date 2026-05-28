@@ -256,7 +256,6 @@ def call_llm(messages, api_base, api_key, model):
             'messages': messages,
             'temperature': 0.85,
             'max_tokens': 1500,
-            'response_format': {'type': 'json_object'}
         }
         resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
         if resp.status_code != 200:
