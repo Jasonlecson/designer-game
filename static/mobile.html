@@ -916,14 +916,14 @@ function renderStatsTab() {
     </div>`;
   }
 
-  // Portfolio
+  // Portfolio & Achievements — auto-load from cache, tap to refresh
   html += `<div style="margin-top:16px;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)">
-    <div style="font-weight:600;font-size:0.76rem;color:var(--accent);margin-bottom:8px;cursor:pointer" onclick="loadMobilePortfolio()">🎨 作品集</div>
-    <div id="m-portfolio" style="font-size:0.68rem;color:var(--text-3)">点击加载作品集</div>
+    <div style="font-weight:600;font-size:0.76rem;color:var(--accent);margin-bottom:8px;cursor:pointer" onclick="loadMobilePortfolio()">🎨 作品集 <span style="font-size:0.62rem;color:var(--text-3);font-weight:400">(点击刷新)</span></div>
+    <div id="m-portfolio">${renderCachedPortfolio()}</div>
   </div>`;
   html += `<div style="margin-top:12px;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)">
-    <div style="font-weight:600;font-size:0.76rem;color:var(--accent);margin-bottom:8px;cursor:pointer" onclick="loadMobileAchievements()">🏅 成就</div>
-    <div id="m-achievements" style="font-size:0.68rem;color:var(--text-3)">点击加载成就列表</div>
+    <div style="font-weight:600;font-size:0.76rem;color:var(--accent);margin-bottom:8px">🏅 成就</div>
+    <div id="m-achievements">${renderCachedAchievements()}</div>
   </div>`;
 
   el.innerHTML = html;
@@ -932,6 +932,37 @@ function renderStatsTab() {
 // ============================================================
 // MOBILE PORTFOLIO & ACHIEVEMENTS
 // ============================================================
+function renderCachedPortfolio() {
+  const entries = gameState?._portfolio_cache;
+  if (!entries || !entries.length) return '<div style="font-size:0.68rem;color:var(--text-3)">还没有完成的作品</div>';
+  let html = '';
+  entries.forEach(e => {
+    html += `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
+      <div style="font-weight:600;font-size:0.74rem">${esc(e.name||'')}</div>
+      <div style="font-size:0.62rem;color:var(--text-3)">${esc(e.time||'')} · ${esc(e.client||'')}</div>
+      <div style="font-size:0.64rem;color:var(--accent)">${esc(e.role||'')} · ${esc(e.style||'')}</div>
+      <div style="font-size:0.62rem;color:var(--text-3)">${esc(e.scene||'')}</div>
+      <div style="font-size:0.66rem;color:var(--text-2);margin-top:2px">${esc(e.highlight||'')}</div>
+    </div>`;
+  });
+  return html;
+}
+
+function renderCachedAchievements() {
+  const all = _achievementsCache;
+  if (!all) return '<div style="font-size:0.68rem;color:var(--text-3)">点击"作品集"加载完整数据</div>';
+  const unlocked = new Set(gameState?.unlocked_achievements || []);
+  let html = '';
+  all.forEach(a => {
+    const u = unlocked.has(a.id);
+    html += `<div style="padding:4px 0;font-size:0.68rem;${u?'':'opacity:0.4'}">
+      ${a.icon} <span style="font-weight:600">${a.name}</span>
+      <span style="color:var(--text-3);font-size:0.62rem"> · ${u?'已解锁':'未解锁'}</span>
+    </div>`;
+  });
+  return html;
+}
+
 async function loadMobilePortfolio() {
   const el = document.getElementById('m-portfolio');
   if (!el) return;
@@ -939,41 +970,20 @@ async function loadMobilePortfolio() {
   try {
     const d = await API.genPortfolio();
     const entries = d.entries || [];
-    if (entries.length === 0) {
-      el.innerHTML = '<div style="color:var(--text-3)">还没有完成的作品</div>';
-      return;
-    }
-    let html = '';
-    entries.forEach((e, i) => {
-      html += `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
-        <div style="font-weight:600;font-size:0.74rem">${esc(e.name||'')}</div>
-        <div style="font-size:0.62rem;color:var(--text-3)">${esc(e.time||'')} · ${esc(e.client||'')}</div>
-        <div style="font-size:0.64rem;color:var(--accent)">${esc(e.role||'')} · ${esc(e.style||'')}</div>
-        <div style="font-size:0.62rem;color:var(--text-3)">${esc(e.scene||'')}</div>
-        <div style="font-size:0.66rem;color:var(--text-2);margin-top:2px">${esc(e.highlight||'')}</div>
-      </div>`;
+    if (gameState) gameState._portfolio_cache = entries;
+    // Also load achievements to populate the cache
+    fetchAchievements().then(() => {
+      const achEl = document.getElementById('m-achievements');
+      if (achEl) achEl.innerHTML = renderCachedAchievements();
     });
-    el.innerHTML = html;
+    el.innerHTML = renderCachedPortfolio();
   } catch(e) { el.innerHTML = '<div style="color:var(--danger)">加载失败</div>'; }
 }
 
 async function loadMobileAchievements() {
-  const el = document.getElementById('m-achievements');
-  if (!el) return;
-  el.innerHTML = '<div class="loading"><div class="dots"><span></span><span></span><span></span></div></div>';
-  try {
-    const all = await fetchAchievements();
-    const unlocked = new Set(gameState.unlocked_achievements || []);
-    let html = '';
-    all.forEach(a => {
-      const u = unlocked.has(a.id);
-      html += `<div style="padding:4px 0;font-size:0.68rem;${u?'':'opacity:0.4'}">
-        ${a.icon} <span style="font-weight:600">${a.name}</span>
-        <span style="color:var(--text-3);font-size:0.62rem"> · ${u?'已解锁':'未解锁'}</span>
-      </div>`;
-    });
-    el.innerHTML = html;
-  } catch(e) { el.innerHTML = '<div style="color:var(--danger)">加载失败</div>'; }
+  // No-op — achievements now render from cache in renderCachedAchievements
+  // If not loaded yet, trigger portfolio load which also loads achievements
+  loadMobilePortfolio();
 }
 
 // ============================================================
