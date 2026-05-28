@@ -1666,7 +1666,7 @@ function renderDashboard() {
   const choicesEl = document.getElementById('event-choices');
   const stamina = gameState.stamina || 80;
   if (stamina <= 0) {
-    choicesEl.innerHTML = `<div style="background:var(--danger-bg);color:var(--danger);text-align:center;padding:16px;border-radius:var(--radius);font-weight:600;font-size:0.85rem">⚡ 精力耗尽 · 下回合将强制休息</div>`;
+    choicesEl.innerHTML = `<div style="background:var(--danger-bg);color:var(--danger);text-align:center;padding:16px;border-radius:var(--radius);font-weight:600;font-size:0.85rem">⚡ 精力耗尽 · 即将强制休息并扣除医疗费用</div>`;
   } else if (last?.choices && last.choices.length > 0) {
     let chHtml = '';
     last.choices.forEach(ch => {

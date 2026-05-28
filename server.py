@@ -1109,7 +1109,7 @@ def build_messages(state, player_action=None):
 
     if player_action:
         if is_forced_rest:
-            messages.append({'role': 'user', 'content': '玩家精力耗尽，陷入强制休息。请叙述她倒下/被迫停下来的场景（150-200字），并给出 2-3 个恢复后的新选择。必须包含 choices 数组。只输出JSON。'})
+            messages.append({'role': 'user', 'content': f'玩家精力耗尽，被迫去医院/躺了几天。花费了 {hospital_fee} 元。请叙述这次健康危机的场景（150-200字），并给出 2-3 个恢复后的新选择。必须包含 choices 数组。只输出JSON。'})
         else:
             messages.append({'role': 'user', 'content': f'玩家刚才的行动: {player_action}\n\n请叙述这个选择带来的后果，并给出接下来的 2-3 个新选择。记住：每个回合代表约1周的时间。必须包含 choices 数组。只输出JSON。'})
     else:
@@ -1343,7 +1343,9 @@ def api_action():
     is_forced_rest = False
     if state.get('stamina', 80) <= 0:
         state['stamina'] = min(100, state['stamina'] + 30)
-        action_text = '精力耗尽，强制休息'
+        hospital_fee = min(state.get('savings', 0), random.randint(1000, 3000))
+        state['savings'] = max(0, state.get('savings', 3000) - hospital_fee)
+        action_text = f'精力耗尽，强制休息，就医花费 {hospital_fee} 元'
         is_forced_rest = True
 
     messages = build_messages(state, action_text)
