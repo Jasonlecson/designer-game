@@ -108,6 +108,9 @@ def save_config(cfg):
 # ============================================================
 SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 
+## 铁律（CRITICAL — 违者请求将被拒）
+你的每一次回复必须是纯 JSON 对象，以 { 开头，以 } 结尾。禁止在 JSON 前后添加任何文字、注释、Markdown 标记。禁止使用 ```json 代码块。只输出 JSON。只输出 JSON。只输出 JSON。
+
 ## 你的身份
 你是本游戏的 DM，负责剧情推进、NPC 扮演、事件生成、职业属性结算。
 
@@ -256,6 +259,7 @@ def call_llm(messages, api_base, api_key, model):
             'messages': messages,
             'temperature': 0.85,
             'max_tokens': 1500,
+            'response_format': {'type': 'json_object'}
         }
         resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
         if resp.status_code != 200:
@@ -1201,9 +1205,9 @@ def build_messages(state, player_action=None):
 
     if player_action:
         if is_forced_rest:
-            messages.append({'role': 'user', 'content': f'玩家精力耗尽，被迫去医院/躺了几天。花费了 {hospital_fee} 元。请叙述这次健康危机的场景（150-200字），并给出 2-3 个恢复后的新选择。必须包含 choices 数组。只输出JSON。'})
+            messages.append({'role': 'user', 'content': f'玩家精力耗尽，被迫去医院/躺了几天。花费了 {hospital_fee} 元。请叙述这次健康危机的场景（150-200字），并给出 2-3 个恢复后的新选择。必须包含 choices 数组。只输出纯JSON。'})
         else:
-            messages.append({'role': 'user', 'content': f'玩家刚才的行动: {player_action}\n\n请叙述这个选择带来的后果，并给出接下来的 2-3 个新选择。记住：每个回合代表约1周的时间。必须包含 choices 数组。只输出JSON。'})
+            messages.append({'role': 'user', 'content': f'玩家刚才的行动: {player_action}\n\n请叙述这个选择带来的后果，并给出接下来的 2-3 个新选择。记住：每个回合代表约1周的时间。只输出纯JSON，不要```json标记。'})
     else:
         # Opening — customized based on origin
         origin = state.get('player', {}).get('origin', '')
@@ -1223,7 +1227,7 @@ def build_messages(state, player_action=None):
             opening_prompt += f'女主在{city}一家公司的品牌部做内部设计师，做着千篇一律的企业物料。'
         else:
             opening_prompt += f'女主刚踏入{city}设计行业。'
-        opening_prompt += '每个回合代表约1周。只输出JSON。'
+        opening_prompt += '每个回合代表约1周。只输出纯JSON，不要```json标记，不要任何额外文字。'
         messages.append({'role': 'user', 'content': opening_prompt})
 
     return messages
@@ -1781,7 +1785,7 @@ def api_portfolio_generate():
     # Build prompt with project narratives
     project_text = '\n'.join([f'项目{i+1}（第{e["turn"]}回合）: {e.get("narrative","")[:200]}' for i, e in enumerate(project_entries)])
     messages = [
-        {'role': 'system', 'content': '你是设计师的作品集编辑。根据项目叙述，为每个项目生成一个简洁的作品集条目。只输出JSON。'},
+        {'role': 'system', 'content': '你是设计师的作品集编辑。根据项目叙述，为每个项目生成一个简洁的作品集条目。只输出纯JSON数组。'},
         {'role': 'user', 'content': f'''根据以下项目经历，生成作品集条目。每个条目包含：name（项目名≤15字）、role（角色≤8字）、style（视觉风格≤10字）、highlight（一句话亮点≤20字）。
 
 {project_text}
