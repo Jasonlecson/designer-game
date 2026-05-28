@@ -724,7 +724,7 @@ function renderStory() {
   } else if (last.choices && last.choices.length > 0) {
     html += `<div class="choices">`;
     last.choices.forEach(ch => {
-      const effects = ch.effects || (ch.effect ? _parseLegacyEffect(ch.effect) : []);
+      const effects = ch.effects || [];
       const effectsHtml = effects.length ? `<div class="eff-preview">${effects.map(e=>{
         const cls = e.delta>0?'eff-up':'eff-down';
         return `<span class="${cls}">${e.delta>0?'↑':'↓'} ${e.text||e.attr||''}</span>`;
@@ -950,82 +950,6 @@ function setLoading(on, msg) {
   if (!el) return;
   if (on) el.innerHTML = '<div class="loading"><div class="dots"><span></span><span></span><span></span></div></div>';
   else if (msg) el.innerHTML = `<div style="color:var(--danger);text-align:center;padding:20px">${msg}</div>`;
-}
-
-// ============================================================
-// HELPERS
-// ============================================================
-function _parseLegacyEffect(str) {
-  if (!str) return [];
-  const map = {'审美':'审美判断力','执行':'执行能力','商业':'商业思维','表达':'表达能力','创意':'创意深度','作品':'作品集厚度'};
-  const result = [];
-  str.split(' ').forEach(p => {
-    for (const [s,f] of Object.entries(map)) {
-      if (p.startsWith(s)) {
-        const d = parseInt(p.slice(s.length));
-        if (!isNaN(d)) result.push({attr:f, delta:d, text:p});
-      }
-    }
-  });
-  return result;
-}
-
-// ============================================================
-// ENDING
-// ============================================================
-function showEnding(ending) {
-  const overlay = document.getElementById('ending-overlay-m');
-  const card = document.getElementById('ending-card-m');
-  card.className = 'ending-card ' + ending.type;
-  document.getElementById('ending-icon-m').textContent = ending.icon;
-  document.getElementById('ending-name-m').textContent = ending.name;
-  document.getElementById('ending-text-m').textContent = ending.text;
-  overlay.classList.add('active');
-}
-
-async function resolveEnding() {
-  if (!window._pendingEnding) return;
-  try {
-    await API.resolveEnding(window._pendingEnding.id);
-    document.getElementById('ending-overlay-m').classList.remove('active');
-    gameState.phase = 'ended';
-    showNotification('achievement', `结局达成：${window._pendingEnding.name}`);
-  } catch(e) {}
-}
-
-function renderIndustryNews() {
-  const el = document.getElementById('tab-story');
-  if (!el || !gameState) return;
-  const news = gameState.industry_news || [];
-  if (news.length === 0) return;
-  let html = '<div class="news-section"><div class="news-title">📰 行业动态</div>';
-  news.forEach(n => { html += `<div class="news-item">· ${esc(n.text)}</div>`; });
-  html += '</div>';
-  const existing = el.querySelector('.news-section');
-  if (!existing) el.insertAdjacentHTML('beforeend', html);
-}
-
-// ============================================================
-// FEEDBACK
-// ============================================================
-async function showFeedback() {
-  let html = `<div class="modal-handle"></div>`;
-  html += `<div class="modal-title">💬 反馈</div>`;
-  html += `<div style="font-size:0.74rem;color:var(--text-2);margin-bottom:12px">有什么想法、建议或 bug？</div>`;
-  html += `<textarea id="fb-text" style="width:100%;height:80px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text-1);font-size:0.82rem;font-family:var(--font-sans);resize:vertical" placeholder="请输入反馈..."></textarea>`;
-  html += `<button class="btn btn-primary btn-wide" style="margin-top:10px" onclick="submitFeedback()">发送反馈</button>`;
-  html += `<div class="modal-close" onclick="closeModal()">取消</div>`;
-  openModal(html);
-}
-
-async function submitFeedback() {
-  const text = document.getElementById('fb-text')?.value?.trim();
-  if (!text) { alert('请输入反馈内容'); return; }
-  try {
-    await API.sendFeedback(text, gameState?.turn_count || 0, gameState?.player?.name || '');
-    closeModal();
-    showNotification('milestone', '反馈已提交，感谢！');
-  } catch(e) { alert('提交失败'); }
 }
 
 // ============================================================

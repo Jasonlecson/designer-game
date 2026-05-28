@@ -651,7 +651,7 @@ function renderDashboard(tc) {
   } else if(last.choices&&last.choices.length>0){
     html += '<div class="choices-box">';
     last.choices.forEach(ch=>{
-      const effects = ch.effects || (ch.effect ? _parseLegacyEffect(ch.effect) : []);
+      const effects = ch.effects || [];
       const effectsHtml = effects.length ? `<div class="ch-effects-preview">${effects.map(e=>{
         const cls = e.delta>0?'eff-up':'eff-down';
         const icon = e.delta>0?'↑':'↓';
@@ -674,21 +674,6 @@ function renderDashboard(tc) {
 }
 
 function toggleAA(){const s=document.getElementById('aa-sub');if(s)s.style.display=s.style.display==='block'?'none':'block'}
-
-function _parseLegacyEffect(str) {
-  if (!str) return [];
-  const map = {'审美':'审美判断力','执行':'执行能力','商业':'商业思维','表达':'表达能力','创意':'创意深度','作品':'作品集厚度'};
-  const result = [];
-  str.split(' ').forEach(p => {
-    for (const [s,f] of Object.entries(map)) {
-      if (p.startsWith(s)) {
-        const d = parseInt(p.slice(s.length));
-        if (!isNaN(d)) result.push({attr:f, delta:d, text:p});
-      }
-    }
-  });
-  return result;
-}
 
 function buildAA(){
   let h='<div style="font-size:0.72rem;color:var(--text-tertiary);text-align:center;margin-bottom:6px">自主行动</div>';

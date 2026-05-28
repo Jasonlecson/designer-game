@@ -403,15 +403,15 @@ def _legacy_effect_to_structured(effect_str):
 def make_fallback_choices(turn_count, attrs):
     '''Always return valid choices, never empty.'''
     base = [
-        {'id': 'A', 'text': '继续当前的工作节奏', 'hint': '稳扎稳打', 'effect': '执行+1'},
-        {'id': 'B', 'text': '主动寻求新机会', 'hint': '冒险可能突破', 'effect': '商业+1 精力-8'},
-        {'id': 'C', 'text': '停下来复盘和思考', 'hint': '恢复和规划', 'effect': '精力+15'},
+        {'id': 'A', 'text': '继续当前的工作节奏', 'hint': '稳扎稳打', 'effects': [{'attr': '执行能力', 'delta': 1, 'text': '执行+1'}]},
+        {'id': 'B', 'text': '主动寻求新机会', 'hint': '冒险可能突破', 'effects': [{'attr': '商业思维', 'delta': 1, 'text': '商业+1'}, {'attr': 'stamina', 'delta': -8, 'text': '精力-8'}]},
+        {'id': 'C', 'text': '停下来复盘和思考', 'hint': '恢复和规划', 'effects': [{'attr': 'stamina', 'delta': 15, 'text': '精力+15'}]},
     ]
     if turn_count % 7 == 0:
         return [
-            {'id': 'A', 'text': '抓住这个转折机会', 'hint': '职业跃升', 'effect': '表达+1 精力-8'},
-            {'id': 'B', 'text': '谨慎观望再做决定', 'hint': '保守安全', 'effect': '执行+2'},
-            {'id': 'C', 'text': '和信任的人商量一下', 'hint': '借助他人视角', 'effect': '表达+1'},
+            {'id': 'A', 'text': '抓住这个转折机会', 'hint': '职业跃升', 'effects': [{'attr': '表达能力', 'delta': 1, 'text': '表达+1'}, {'attr': 'stamina', 'delta': -8, 'text': '精力-8'}]},
+            {'id': 'B', 'text': '谨慎观望再做决定', 'hint': '保守安全', 'effects': [{'attr': '执行能力', 'delta': 2, 'text': '执行+2'}]},
+            {'id': 'C', 'text': '和信任的人商量一下', 'hint': '借助他人视角', 'effects': [{'attr': '表达能力', 'delta': 1, 'text': '表达+1'}]},
         ]
     return base
 
@@ -426,21 +426,31 @@ def validate_and_fix_result(result, turn_count, attrs):
     # Ensure each choice has required fields
     for i, ch in enumerate(result['choices']):
         if not isinstance(ch, dict):
-            result['choices'][i] = {'id': chr(65+i), 'text': f'继续推进', 'hint': '下一步', 'effect': ''}
+            result['choices'][i] = {'id': chr(65+i), 'text': '继续推进', 'hint': '下一步', 'effects': []}
         if 'id' not in ch:
             ch['id'] = chr(65+i)
         if 'text' not in ch:
             ch['text'] = '继续推进'
         if 'hint' not in ch:
             ch['hint'] = ''
-        if 'effect' not in ch:
-            ch['effect'] = ''
+        # Normalize effects: always use 'effects' array format
+        if 'effects' not in ch:
+            ch['effects'] = []
     # Ensure 2-3 choices
     if len(result['choices']) < 2:
         result['choices'] = make_fallback_choices(turn_count, attrs)
     if len(result['choices']) > 3:
         result['choices'] = result['choices'][:3]
-    if not result.get('atmosphere'):
+    # Normalize all choices to effects[] format (convert legacy 'effect' strings)
+    for ch in result.get('choices', []):
+        if 'effect' in ch and isinstance(ch['effect'], str) and ch['effect'].strip():
+            # Legacy string found, convert and remove
+            converted = _legacy_effect_to_structured(ch['effect'])
+            if converted:
+                ch['effects'] = converted
+            ch.pop('effect', None)
+        if 'effects' not in ch or not isinstance(ch['effects'], list):
+            ch['effects'] = []
         result['atmosphere'] = '设计工作室的日常'
     if not result.get('event_tag'):
         result['event_tag'] = '日常'
@@ -454,10 +464,6 @@ def validate_and_fix_result(result, turn_count, attrs):
         result['stamina_change'] = -5
     if 'savings_change' not in result:
         result['savings_change'] = 0
-    # Ensure each choice has effect field
-    for ch in result.get('choices', []):
-        if 'effect' not in ch:
-            ch['effect'] = ''
     return result
 
 def apply_npc_updates(npcs, npc_updates):
@@ -593,55 +599,36 @@ def xp_to_attrs(state):
         attrs[attr] = xp_to_level(xp_dict.get(attr, 0))
     return attrs
 
-def apply_effect_xp(state, effect_input):
-    '''Apply choice effects — supports both legacy string and structured array.
-    Legacy: "审美+1 执行-2"  |  Structured: [{"attr": "审美判断力", "delta": 1}]
-    Also supports old-style list [('审美判断力', 1), ...]
+def apply_effect_xp(state, effects_list):
+    '''Apply choice effects — always uses structured format.
+    Format: [{"attr": "审美判断力", "delta": 1, "text": "..."}, ...]
     Returns {attr: level_change} for notification.'''
     level_changes = {}
-    if not effect_input:
+    if not effects_list or not isinstance(effects_list, list):
         return level_changes
 
-    SHORT_MAP = {
-        '审美': '审美判断力', '执行': '执行能力', '商业': '商业思维',
-        '表达': '表达能力', '创意': '创意深度', '作品': '作品集厚度'
-    }
     XP_PER_EFFECT_POINT = 50
     xp = state.get('attribute_xp', {})
-    effects_list = []
 
-    if isinstance(effect_input, list):
-        for item in effect_input:
-            if isinstance(item, dict):
-                attr = item.get('attr', '')
-                delta = item.get('delta', 0)
-                if attr in SHORT_MAP.values():
-                    effects_list.append((attr, delta))
-                elif attr == 'stamina':
-                    state['stamina'] = max(0, min(100, state.get('stamina', 80) + delta))
-                elif attr == 'savings':
-                    state['savings'] = max(0, state.get('savings', 3000) + delta)
-            elif isinstance(item, (tuple, list)) and len(item) == 2:
-                effects_list.append((item[0], item[1]))
-    else:
-        # Legacy string format
-        parts = str(effect_input).strip().split()
-        for part in parts:
-            for short, full in SHORT_MAP.items():
-                if part.startswith(short):
-                    try:
-                        delta = int(part[len(short):])
-                        effects_list.append((full, delta))
-                    except (ValueError, IndexError):
-                        continue
-
-    for full, delta in effects_list:
-        xp_delta = XP_PER_EFFECT_POINT * delta
-        old_level = xp_to_level(xp.get(full, 0))
-        xp[full] = xp.get(full, 0) + xp_delta
-        new_level = xp_to_level(xp[full])
-        if new_level != old_level:
-            level_changes[full] = new_level - old_level
+    for ef in effects_list:
+        if not isinstance(ef, dict):
+            continue
+        attr = ef.get('attr', '')
+        delta = ef.get('delta', 0)
+        if not attr or not delta:
+            continue
+        if attr == 'stamina':
+            state['stamina'] = max(0, min(100, state.get('stamina', 80) + delta))
+        elif attr == 'savings':
+            state['savings'] = max(0, state.get('savings', 3000) + delta)
+        else:
+            # Core attribute
+            xp_delta = XP_PER_EFFECT_POINT * delta
+            old_level = xp_to_level(xp.get(attr, 0))
+            xp[attr] = xp.get(attr, 0) + xp_delta
+            new_level = xp_to_level(xp[attr])
+            if new_level != old_level:
+                level_changes[attr] = new_level - old_level
 
     state['attribute_xp'] = xp
     return level_changes
@@ -1737,7 +1724,7 @@ def api_action():
             for ch in last_entry['choices']:
                 if ch['id'] == choice_id:
                     action_text = ch['text']
-                    chosen_effect = ch.get('effect', '')
+                    chosen_effect = ch.get('effects', [])
                     break
     if not action_text:
         action_text = '玩家做出了选择'
@@ -2452,7 +2439,7 @@ def api_action_stream():
                 for ch in last_entry['choices']:
                     if ch['id'] == choice_id:
                         action_text = ch['text']
-                        chosen_effect = ch.get('effect', '') or ch.get('effects', [])
+                        chosen_effect = ch.get('effects', [])
                         break
         if not action_text:
             action_text = '玩家做出了选择'
