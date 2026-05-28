@@ -578,18 +578,6 @@ function renderCreateStep() {
     html += `<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=3;renderCreateStep()">←</button><button class="btn btn-primary" onclick="startGame()">✦ 开始</button></div>`;
   }
 
-  // Portfolio section
-  html += `<div style="margin-top:16px;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)">
-    <div style="font-weight:600;font-size:0.76rem;color:var(--accent);margin-bottom:8px;cursor:pointer" onclick="loadMobilePortfolio()">🎨 作品集</div>
-    <div id="m-portfolio" style="font-size:0.68rem;color:var(--text-3)">点击加载作品集</div>
-  </div>`;
-
-  // Achievements section
-  html += `<div style="margin-top:12px;padding:14px;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)">
-    <div style="font-weight:600;font-size:0.76rem;color:var(--accent);margin-bottom:8px" onclick="loadMobileAchievements()">🏅 成就</div>
-    <div id="m-achievements" style="font-size:0.68rem;color:var(--text-3)">点击加载成就列表</div>
-  </div>`;
-
   el.innerHTML = html;
 }
 
