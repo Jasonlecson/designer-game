@@ -906,8 +906,31 @@ def advance_project_phase(state):
         state['savings'] = state.get('savings', 0) + proj.get('budget', 5000)
         state['attributes']['作品集厚度'] = min(ATTR_CAP, state.get('attributes', {}).get('作品集厚度', 1) + 1)
         state['attributes']['商业思维'] = min(ATTR_CAP, state.get('attributes', {}).get('商业思维', 3) + 1)
+        # Record to portfolio
+        add_portfolio_entry(state, proj)
 
     return phase_hints.get(proj.get('phase', ''), '') if phases_progressed else None
+
+def add_portfolio_entry(state, proj):
+    '''Record a completed project into the portfolio list.'''
+    if 'portfolio' not in state:
+        state['portfolio'] = []
+    turn = state.get('turn_count', 0)
+    # Extract last narrative line that mentions this project
+    last_entry = state['story_log'][-1] if state['story_log'] else {}
+    summary = ''
+    if last_entry.get('event_tag') == '项目推进':
+        summary = (last_entry.get('narrative', '') or '')[:100]
+    entry = {
+        'name': proj.get('name', '设计项目'),
+        'time': get_game_date(state),
+        'turn': turn,
+        'client': proj.get('client', ''),
+        'budget': proj.get('budget', 0),
+        'quality': proj.get('quality', 50),
+        'summary': summary,
+    }
+    state['portfolio'].append(entry)
 
 # ============================================================
 # 4. Narrative Arc System — 跨回合叙事弧
@@ -2186,55 +2209,11 @@ def api_industry_news():
 
 @app.route('/api/portfolio/generate', methods=['POST'])
 def api_portfolio_generate():
+    '''Return cached portfolio entries from state — no LLM call needed.'''
     state = load_state()
     if not state:
-        return jsonify({'error': '没有存档'}), 404
-    cfg = load_config()
-    if not cfg.get('api_key'):
-        return jsonify({'error': '请先配置 API Key'}), 400
-
-    log = state.get('story_log', [])
-    projects = log[-8:]  # Last 8 entries
-    project_entries = [e for e in projects if e.get('event_tag') == '项目推进']
-
-    if not project_entries:
-        return jsonify({'entries': [], 'message': '还没有完成的项目'})
-
-    # Build prompt with project narratives + game date context
-    project_text = '\n'.join([f'项目{i+1}（第{e["turn"]}回合）: {e.get("narrative","")[:200]}' for i, e in enumerate(project_entries)])
-    game_month = get_game_date(state)
-    messages = [
-        {'role': 'system', 'content': '你是资深设计师的作品集编辑。根据项目经历生成专业的作品集条目。只输出纯JSON数组。'},
-        {'role': 'user', 'content': f'''根据以下项目经历生成作品集条目。当前时间约{game_month}。
-
-每个条目包含：
-- name：项目名称（≤15字）
-- time：大致时间（基于回合数和{game_month}推算，如"2010年3月"）
-- client：客户/委托方（≤10字）
-- role：你的角色（≤8字）
-- style：视觉风格（≤10字）
-- highlight：一句话亮点（≤20字）
-- scene：项目场景/背景（≤30字，如"为某品牌新品发布设计全套视觉方案"）
-
-{project_text}
-
-只输出JSON数组，格式：[{{"name":"","time":"","client":"","role":"","style":"","highlight":"","scene":""}}, ...]'''}
-    ]
-    result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
-    if error:
-        return jsonify({'entries': [], 'message': '生成失败'})
-
-    try:
-        content = result if isinstance(result, list) else json.loads(result) if isinstance(result, str) else []
-        # Clean markdown
-        if isinstance(content, str):
-            content = content.replace('```json', '').replace('```', '').strip()
-            content = json.loads(content)
-        entries = content if isinstance(content, list) else []
-    except:
-        entries = []
-
-    return jsonify({'entries': entries})
+        return jsonify({'entries': []})
+    return jsonify({'entries': state.get('portfolio', [])})
 
 # ============================================================
 # I4-P1: Active Actions (non-LLM turns)

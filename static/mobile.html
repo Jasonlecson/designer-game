@@ -939,10 +939,9 @@ function renderCachedPortfolio() {
   entries.forEach(e => {
     html += `<div style="padding:8px 0;border-bottom:1px solid var(--border)">
       <div style="font-weight:600;font-size:0.74rem">${esc(e.name||'')}</div>
-      <div style="font-size:0.62rem;color:var(--text-3)">${esc(e.time||'')} · ${esc(e.client||'')}</div>
-      <div style="font-size:0.64rem;color:var(--accent)">${esc(e.role||'')} · ${esc(e.style||'')}</div>
-      <div style="font-size:0.62rem;color:var(--text-3)">${esc(e.scene||'')}</div>
-      <div style="font-size:0.66rem;color:var(--text-2);margin-top:2px">${esc(e.highlight||'')}</div>
+      <div style="font-size:0.62rem;color:var(--text-3)">${esc(e.time||'')} · ${esc(e.client||'')} · 预算${(e.budget||0)/1000}k</div>
+      <div style="font-size:0.62rem;color:var(--accent)">质量 ${e.quality||0}/100 · 第${e.turn}回合</div>
+      <div style="font-size:0.64rem;color:var(--text-2);margin-top:2px">${esc((e.summary||'').substring(0,60))}</div>
     </div>`;
   });
   return html;

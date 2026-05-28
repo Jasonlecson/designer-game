@@ -793,7 +793,7 @@ async function loadPortfolio(){
     const colors=['var(--accent)','var(--success)','#7b8fa1','#c4a43e','#8e6b9e','#c4755e'];
     grid.innerHTML = entries.length===0
       ?'<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-tertiary);font-size:0.75rem">还没有完成的作品</div>'
-      :entries.map((e,i)=>`<div class="pt-card"><div class="pt-card-visual" style="background:linear-gradient(135deg,${colors[i%6]}22,${colors[(i+1)%6]}11)">🖼️</div><div class="pt-card-name">${esc(e.name||'')}</div><div class="pt-card-time" style="font-size:0.6rem;color:var(--text-tertiary)">${esc(e.time||'')} · ${esc(e.client||'')}</div><div class="pt-card-role">${esc(e.role||'')}</div><div class="pt-card-style">${esc(e.style||'')}</div><div class="pt-card-scene" style="font-size:0.62rem;color:var(--text-tertiary);margin-top:2px">${esc(e.scene||'')}</div><div class="pt-card-highlight">${esc(e.highlight||'')}</div></div>`).join('');
+      :entries.map((e,i)=>`<div class="pt-card"><div class="pt-card-visual" style="background:linear-gradient(135deg,${colors[i%6]}22,${colors[(i+1)%6]}11)">🖼️</div><div class="pt-card-name">${esc(e.name||'')}</div><div class="pt-card-time" style="font-size:0.6rem;color:var(--text-tertiary)">${esc(e.time||'')} · ${esc(e.client||'')} · ${(e.budget||0)/1000}k</div><div style="font-size:0.6rem;color:var(--accent)">质量 ${e.quality||0}/100</div><div class="pt-card-highlight">${esc((e.summary||'').substring(0,60))}</div></div>`).join('');
   }catch(e){}
 }
 
