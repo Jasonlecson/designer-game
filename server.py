@@ -129,7 +129,7 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 
 不要让女主一直处于"苦熬"状态。挫折之后要有回弹，低谷之后要有光亮。职业生涯是马拉松，不是持续的泥潭。
 
-## 核心属性（1-10分）
+## 核心属性（1-15分）
 审美判断力 — 视觉品味、风格把控、设计决策
 执行能力   — 落地速度、改稿效率、抗压韧性
 商业思维   — 定价谈判、理解客户需求、市场嗅觉
@@ -317,7 +317,7 @@ def validate_and_fix_result(result, turn_count, attrs):
     for key in ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']:
         if key not in result['attr_display']:
             result['attr_display'][key] = attrs.get(key, 5)
-        result['attr_display'][key] = max(1, min(10, int(result['attr_display'][key])))
+        result['attr_display'][key] = max(1, min(ATTR_CAP, int(result['attr_display'][key])))
     # Stamina & savings
     if 'stamina_change' not in result:
         result['stamina_change'] = -5
@@ -363,7 +363,7 @@ def apply_choice_effects(state, choice_effect):
                     delta_str = part.replace(short, '').replace(' ', '')
                     delta = int(delta_str)
                     current = state['attributes'].get(full, 5)
-                    state['attributes'][full] = max(1, min(10, current + delta))
+                    state['attributes'][full] = max(1, min(ATTR_CAP, current + delta))
                     applied[full] = delta
                 except (ValueError, KeyError):
                     pass
@@ -413,30 +413,31 @@ def apply_company_update(state, company_update):
 # Career Title / Stage System
 # ============================================================
 # (moved up for milestone reference)
+ATTR_CAP = 15  # Max attribute value (was 10)
 TITLE_THRESHOLDS = [
     {'title': '见习设计师',     'stage': '萌芽期', 'attrs': {}},
-    {'title': '初级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 3, '执行能力': 3}},
-    {'title': '中级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 5, '执行能力': 5, '作品集厚度': 3}},
-    {'title': '高级设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 7, '执行能力': 6, '作品集厚度': 5, '表达能力': 5}},
-    {'title': '资深设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 7, '执行能力': 7, '作品集厚度': 7, '表达能力': 6, '商业思维': 5}},
-    {'title': '设计总监',       'stage': '巅峰期', 'attrs': {'审美判断力': 8, '执行能力': 7, '作品集厚度': 8, '表达能力': 7, '商业思维': 7, '创意深度': 7}},
-    {'title': '创意合伙人',     'stage': '巅峰期', 'attrs': {'审美判断力': 9, '执行能力': 8, '作品集厚度': 9, '表达能力': 8, '商业思维': 8, '创意深度': 8}},
-    {'title': '独立设计大师',   'stage': '传奇',   'attrs': {'审美判断力': 9, '作品集厚度': 10, '表达能力': 9, '创意深度': 9}},
+    {'title': '初级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 4, '执行能力': 4}},
+    {'title': '中级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 7, '执行能力': 7, '作品集厚度': 5}},
+    {'title': '高级设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 10, '执行能力': 9, '作品集厚度': 7, '表达能力': 7}},
+    {'title': '资深设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 11, '执行能力': 10, '作品集厚度': 10, '表达能力': 9, '商业思维': 7}},
+    {'title': '设计总监',       'stage': '巅峰期', 'attrs': {'审美判断力': 12, '执行能力': 11, '作品集厚度': 11, '表达能力': 10, '商业思维': 10, '创意深度': 10}},
+    {'title': '创意合伙人',     'stage': '巅峰期', 'attrs': {'审美判断力': 13, '执行能力': 12, '作品集厚度': 13, '表达能力': 12, '商业思维': 12, '创意深度': 12}},
+    {'title': '独立设计大师',   'stage': '传奇',   'attrs': {'审美判断力': 14, '作品集厚度': 14, '表达能力': 13, '创意深度': 13}},
 ]
 
 ACHIEVEMENTS = [
     {'id': 'first_project',  'name': '初出茅庐', 'desc': '完成第一个设计项目', 'icon': '🌱'},
-    {'id': 'portfolio_5',    'name': '作品等身', 'desc': '作品集厚度达到 5',  'icon': '📦'},
-    {'id': 'portfolio_8',    'name': '业界标杆', 'desc': '作品集厚度达到 8',  'icon': '🏆'},
-    {'id': 'expression_7',   'name': '金字招牌', 'desc': '表达能力达到 7',    'icon': '🤝'},
-    {'id': 'expression_9',   'name': '德高望重', 'desc': '表达能力达到 9',    'icon': '👑'},
-    {'id': 'aesthetic_8',    'name': '审美大师', 'desc': '审美判断力达到 8',  'icon': '🎨'},
+    {'id': 'portfolio_7',    'name': '作品等身', 'desc': '作品集厚度达到 7',  'icon': '📦'},
+    {'id': 'portfolio_12',   'name': '业界标杆', 'desc': '作品集厚度达到 12', 'icon': '🏆'},
+    {'id': 'expression_10',  'name': '金字招牌', 'desc': '表达能力达到 10',   'icon': '🤝'},
+    {'id': 'expression_13',  'name': '德高望重', 'desc': '表达能力达到 13',   'icon': '👑'},
+    {'id': 'aesthetic_12',   'name': '审美大师', 'desc': '审美判断力达到 12', 'icon': '🎨'},
     {'id': 'stamina_low',    'name': '至暗时刻', 'desc': '精力值降到 10 以下','icon': '🌑'},
     {'id': 'stamina_recover','name': '涅槃重生', 'desc': '精力从低谷恢复到 70+','icon': '🔥'},
     {'id': 'npc_3_related',  'name': '社交达人', 'desc': '与 3 位 NPC 建立关系', 'icon': '💬'},
     {'id': 'turn_20',        'name': '十年磨一剑', 'desc': '职业生涯超过 20 回合', 'icon': '⏳'},
     {'id': 'turn_50',        'name': '老设计师',   'desc': '职业生涯超过 50 回合', 'icon': '📜'},
-    {'id': 'all_rounder',    'name': '六边形战士', 'desc': '所有属性达到 6 以上', 'icon': '⭐'},
+    {'id': 'all_rounder',    'name': '六边形战士', 'desc': '全属性 ≥ 8', 'icon': '⭐'},
 ]
 
 # ============================================================
@@ -507,7 +508,7 @@ def generate_milestone(state):
             state['_milestone_start_savings'] = state.get('savings', 3000)
         elif tpl['type'] == 'learning':
             attr = _random.choice(['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度'])
-            target = min(10, state.get('attributes', {}).get(attr, 5) + _random.choice([2, 3]))
+            target = min(ATTR_CAP, state.get('attributes', {}).get(attr, 5) + _random.choice([2, 3]))
             desc = desc.replace('{attr_name}', attr).replace('{attr_target}', str(target))
             state['_milestone_attr'] = attr
             state['_milestone_attr_target'] = target
@@ -682,8 +683,8 @@ def advance_project_phase(state):
         proj['phase'] = '完成'; phases_progressed = True
         # Completion reward
         state['savings'] = state.get('savings', 0) + proj.get('budget', 5000)
-        state['attributes']['作品集厚度'] = min(10, state.get('attributes', {}).get('作品集厚度', 1) + 1)
-        state['attributes']['商业思维'] = min(10, state.get('attributes', {}).get('商业思维', 3) + 1)
+        state['attributes']['作品集厚度'] = min(ATTR_CAP, state.get('attributes', {}).get('作品集厚度', 1) + 1)
+        state['attributes']['商业思维'] = min(ATTR_CAP, state.get('attributes', {}).get('商业思维', 3) + 1)
 
     return phase_hints.get(proj.get('phase', ''), '') if phases_progressed else None
 
@@ -780,7 +781,7 @@ def check_career_challenge(state):
                 if attr == '精力值':
                     state['stamina'] = max(0, state.get('stamina', 80) + delta)
                 elif attr in state.get('attributes', {}):
-                    state['attributes'][attr] = max(1, min(10, state['attributes'][attr] + delta))
+                    state['attributes'][attr] = max(1, min(ATTR_CAP, state['attributes'][attr] + delta))
             return ch
     return None
 
@@ -992,11 +993,11 @@ def check_achievements(state, prev_stamina=None):
             new_unlocks.append(ach_id)
 
     # Attribute-based
-    if attrs.get('作品集厚度', 0) >= 5: unlock('portfolio_5')
-    if attrs.get('作品集厚度', 0) >= 8: unlock('portfolio_8')
-    if attrs.get('表达能力', 0) >= 7: unlock('expression_7')
-    if attrs.get('表达能力', 0) >= 9: unlock('expression_9')
-    if attrs.get('审美判断力', 0) >= 8: unlock('aesthetic_8')
+    if attrs.get('作品集厚度', 0) >= 7: unlock('portfolio_7')
+    if attrs.get('作品集厚度', 0) >= 12: unlock('portfolio_12')
+    if attrs.get('表达能力', 0) >= 10: unlock('expression_10')
+    if attrs.get('表达能力', 0) >= 13: unlock('expression_13')
+    if attrs.get('审美判断力', 0) >= 12: unlock('aesthetic_12')
 
     # Stamina
     if stamina <= 10: unlock('stamina_low')
@@ -1013,7 +1014,7 @@ def check_achievements(state, prev_stamina=None):
 
     # All-rounder
     all_attrs = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']
-    if all(attrs.get(k, 0) >= 6 for k in all_attrs): unlock('all_rounder')
+    if all(attrs.get(k, 0) >= 8 for k in all_attrs): unlock('all_rounder')
 
     # First project — check if any log entry has event_tag '项目推进'
     if any(e.get('event_tag') == '项目推进' for e in state.get('story_log', [])):
@@ -1218,10 +1219,10 @@ def api_new_game():
 
     attributes = attr_base.get(origin_key, attr_base['自定义']).copy()
     if '引路人' in player['resources']:
-        attributes['表达能力'] = min(10, attributes['表达能力'] + 2)
+        attributes['表达能力'] = min(ATTR_CAP, attributes['表达能力'] + 2)
     if '人脉' in player['resources']:
-        attributes['表达能力'] = min(10, attributes['表达能力'] + 1)
-        attributes['作品集厚度'] = min(10, attributes['作品集厚度'] + 1)
+        attributes['表达能力'] = min(ATTR_CAP, attributes['表达能力'] + 1)
+        attributes['作品集厚度'] = min(ATTR_CAP, attributes['作品集厚度'] + 1)
 
     npcs = generate_npcs()
 
@@ -1398,7 +1399,7 @@ def api_action():
             state['attributes'][key] = llm_val
         else:
             # LLM drifted too far, bring it back toward deterministic
-            state['attributes'][key] = max(1, min(10, int((deterministic + llm_val) / 2)))
+            state['attributes'][key] = max(1, min(ATTR_CAP, int((deterministic + llm_val) / 2)))
     state['stamina'] = max(0, min(100, state.get('stamina', 80) + result.get('stamina_change', -5)))
     state['savings'] = max(0, state.get('savings', 3000) + result.get('savings_change', 0))
     state['turn_count'] = turn
@@ -1585,7 +1586,7 @@ def api_npc_interact():
     for short, full in [('审美', '审美判断力'), ('执行', '执行能力'), ('商业', '商业思维'),
                          ('表达', '表达能力'), ('创意', '创意深度')]:
         if f'{short}+1' in effect:
-            attrs[full] = min(10, attrs.get(full, 5) + 1)
+            attrs[full] = min(ATTR_CAP, attrs.get(full, 5) + 1)
         if f'{short}-1' in effect:
             attrs[full] = max(1, attrs.get(full, 5) - 1)
     state['attributes'] = attrs
@@ -1764,12 +1765,12 @@ def api_active_action():
     action_context = ''
     if action_key == 'train' and action_attr:
         if action_attr in state.get('attributes', {}):
-            state['attributes'][action_attr] = min(10, state['attributes'][action_attr] + 1)
+            state['attributes'][action_attr] = min(ATTR_CAP, state['attributes'][action_attr] + 1)
             action_context = f'主动行动：报班学习{action_attr}，属性提升+1。'
             result_msg = f'{action_attr} +1'
     elif action_key == 'train_intensive' and action_attr:
         if action_attr in state.get('attributes', {}):
-            state['attributes'][action_attr] = min(10, state['attributes'][action_attr] + 2)
+            state['attributes'][action_attr] = min(ATTR_CAP, state['attributes'][action_attr] + 2)
             action_context = f'主动行动：参加封闭集训，高强度学习{action_attr}，属性提升+2，但极度消耗精力和金钱。'
             result_msg = f'{action_attr} +2'
     elif action_key == 'rest_short':
@@ -1781,7 +1782,7 @@ def api_active_action():
         action_context = f'主动行动：请了一周假，深度休息，精力恢复+35。但项目进度可能受到了一些影响。'
         result_msg = '精力 +35'
     elif action_key == 'portfolio':
-        state['attributes']['作品集厚度'] = min(10, state['attributes'].get('作品集厚度', 1) + 1)
+        state['attributes']['作品集厚度'] = min(ATTR_CAP, state['attributes'].get('作品集厚度', 1) + 1)
         action_context = f'主动行动：花了大量时间整理和打磨作品集，作品集厚度+1。这段时间你的设计产出减少了，但作品质量在提升。'
         result_msg = '作品集厚度 +1'
     elif action_key == 'jobhunt_targeted':
