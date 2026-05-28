@@ -593,34 +593,56 @@ def xp_to_attrs(state):
         attrs[attr] = xp_to_level(xp_dict.get(attr, 0))
     return attrs
 
-def apply_effect_xp(state, effect_str):
-    '''Apply choice effect like '审美+1 执行-2' directly to XP.
-    +1 means add XP_PER_EFFECT_POINT XP per point (50 XP per +1).
+def apply_effect_xp(state, effect_input):
+    '''Apply choice effects — supports both legacy string and structured array.
+    Legacy: "审美+1 执行-2"  |  Structured: [{"attr": "审美判断力", "delta": 1}]
+    Also supports old-style list [('审美判断力', 1), ...]
     Returns {attr: level_change} for notification.'''
     level_changes = {}
-    if not effect_str:
+    if not effect_input:
         return level_changes
+
     SHORT_MAP = {
         '审美': '审美判断力', '执行': '执行能力', '商业': '商业思维',
         '表达': '表达能力', '创意': '创意深度', '作品': '作品集厚度'
     }
-    XP_PER_EFFECT_POINT = 50  # Fixed XP per +1 in effect string
-    parts = effect_str.strip().split()
+    XP_PER_EFFECT_POINT = 50
     xp = state.get('attribute_xp', {})
-    for part in parts:
-        for short, full in SHORT_MAP.items():
-            if part.startswith(short):
-                try:
-                    change = int(part[len(short):])
-                except (ValueError, IndexError):
-                    continue
-                xp_delta = XP_PER_EFFECT_POINT * change
-                old_level = xp_to_level(xp.get(full, 0))
-                xp[full] = xp.get(full, 0) + xp_delta
-                new_level = xp_to_level(xp[full])
-                if new_level != old_level:
-                    level_changes[full] = new_level - old_level
-                break
+    effects_list = []
+
+    if isinstance(effect_input, list):
+        for item in effect_input:
+            if isinstance(item, dict):
+                attr = item.get('attr', '')
+                delta = item.get('delta', 0)
+                if attr in SHORT_MAP.values():
+                    effects_list.append((attr, delta))
+                elif attr == 'stamina':
+                    state['stamina'] = max(0, min(100, state.get('stamina', 80) + delta))
+                elif attr == 'savings':
+                    state['savings'] = max(0, state.get('savings', 3000) + delta)
+            elif isinstance(item, (tuple, list)) and len(item) == 2:
+                effects_list.append((item[0], item[1]))
+    else:
+        # Legacy string format
+        parts = str(effect_input).strip().split()
+        for part in parts:
+            for short, full in SHORT_MAP.items():
+                if part.startswith(short):
+                    try:
+                        delta = int(part[len(short):])
+                        effects_list.append((full, delta))
+                    except (ValueError, IndexError):
+                        continue
+
+    for full, delta in effects_list:
+        xp_delta = XP_PER_EFFECT_POINT * delta
+        old_level = xp_to_level(xp.get(full, 0))
+        xp[full] = xp.get(full, 0) + xp_delta
+        new_level = xp_to_level(xp[full])
+        if new_level != old_level:
+            level_changes[full] = new_level - old_level
+
     state['attribute_xp'] = xp
     return level_changes
 
