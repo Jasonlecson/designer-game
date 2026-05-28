@@ -1,0 +1,148 @@
+{
+  "phase": "playing",
+  "player": {
+    "name": "小陆",
+    "age": "24",
+    "city": "上海",
+    "origin": "设计专业应届生",
+    "resources": "零资源白手起家",
+    "goal": "成为顶级独立设计师",
+    "pace": "A"
+  },
+  "attributes": {
+    "审美判断力": 6,
+    "执行能力": 4,
+    "商业思维": 2,
+    "表达能力": 4,
+    "创意深度": 6,
+    "作品集厚度": 1
+  },
+  "npcs": [
+    {
+      "id": "npc_0",
+      "name": "顾念之",
+      "role": "行业前辈/导师",
+      "tag": "前老板",
+      "relation": "导师/潜在推荐人",
+      "desc": "顾念之，行业前辈，曾指导你的毕业设计。她发来了一封简短邮件，提到某个朋友的工作室在招实习生。",
+      "active": true
+    },
+    {
+      "id": "npc_1",
+      "name": "周念",
+      "role": "竞争对手",
+      "tag": "有野心",
+      "relation": "待剧情展开",
+      "desc": "周念，竞争对手。",
+      "active": true
+    },
+    {
+      "id": "npc_2",
+      "name": "沈予安",
+      "role": "甲方/客户",
+      "tag": "产品经理",
+      "relation": "待剧情展开",
+      "desc": "沈予安，甲方/客户。",
+      "active": true
+    },
+    {
+      "id": "npc_3",
+      "name": "陆屿",
+      "role": "合作者/搭档",
+      "tag": "前端开发",
+      "relation": "待剧情展开",
+      "desc": "陆屿，合作者/搭档。",
+      "active": true
+    },
+    {
+      "id": "npc_4",
+      "name": "陈知夏",
+      "role": "行业暗流",
+      "tag": "争议人物",
+      "relation": "待剧情展开",
+      "desc": "陈知夏，行业暗流。",
+      "active": true
+    },
+    {
+      "id": "npc_5",
+      "name": "方屿",
+      "role": "职场关系",
+      "tag": "直属上级",
+      "relation": "待剧情展开",
+      "desc": "方屿，职场关系。",
+      "active": true
+    }
+  ],
+  "story_log": [
+    {
+      "turn": 1,
+      "player_action": "开始游戏",
+      "narrative": "五月的上海，梧桐叶刚生出新绿。你坐在出租屋的床上，笔记本电脑上摊开了三十份未投出的简历。手机屏幕亮着——一条推送：「第16届上海设计周公开征集参展作品，截稿6月1日。」而另一封未读邮件，来自导师顾念之，标题写着「有个实习内推机会，感兴趣？」窗外传来楼下咖啡店的研磨声。你的储蓄还够撑两个月，但每一分钱都要精打细算。",
+      "choices": [
+        {
+          "id": "A",
+          "text": "投递简历海投设计工作室",
+          "hint": "一周内收到3家面试",
+          "effect": "执行-1 精力-10"
+        },
+        {
+          "id": "B",
+          "text": "联系顾念之争取内推",
+          "hint": "获得一个明确内推机会",
+          "effect": "表达+1 商业+1"
+        },
+        {
+          "id": "C",
+          "text": "赶制一幅作品投稿设计周",
+          "hint": "冒截稿风险，但可能曝光",
+          "effect": "创意+2 作品+1 精力-15"
+        }
+      ],
+      "atmosphere": "春末的犹豫与机遇",
+      "attr_display": {
+        "审美判断力": 6,
+        "执行能力": 4,
+        "商业思维": 2,
+        "表达能力": 4,
+        "创意深度": 6,
+        "作品集厚度": 1
+      },
+      "event_tag": "行业事件"
+    }
+  ],
+  "current_project": null,
+  "turn_count": 1,
+  "stamina": 80,
+  "savings": 3000,
+  "start_date": "2026-05-27T22:10:00.775903",
+  "created_at": "2026-05-27T22:10:00.776976",
+  "trait": {
+    "name": "学院派",
+    "desc": "理论基础扎实，对新风格吸收快"
+  },
+  "milestone": {
+    "type": "promotion",
+    "description": "晋升至中级设计师",
+    "deadline_turn": 9,
+    "progress": 0,
+    "reward": "表达+2 储蓄+3000",
+    "completed": false
+  },
+  "career_history": [],
+  "company": {
+    "name": "待定",
+    "position": "见习设计师",
+    "action": "求职中",
+    "turn": 0
+  },
+  "title": {
+    "title": "初级设计师",
+    "stage": "成长期",
+    "attrs": {
+      "审美判断力": 3,
+      "执行能力": 3
+    }
+  },
+  "unlocked_achievements": [],
+  "_milestone_target_title": "中级设计师"
+}

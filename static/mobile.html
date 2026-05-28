@@ -415,6 +415,21 @@ body{
 .notif-icon{font-size:1rem}
 .notif-text{font-size:0.78rem;line-height:1.4}
 
+/* Ending overlay */
+.ending-overlay{position:fixed;inset:0;z-index:11000;background:rgba(0,0,0,0.7);display:none;align-items:center;justify-content:center}
+.ending-overlay.active{display:flex}
+.ending-card{background:var(--bg-card);border-radius:var(--radius-lg);padding:32px 24px;max-width:320px;width:90%;text-align:center}
+.ending-card.he{border-top:3px solid var(--accent)}
+.ending-card.be{border-top:3px solid var(--danger)}
+.ending-icon-m{font-size:2rem;margin-bottom:12px;display:block}
+.ending-name-m{font-family:var(--font-serif);font-size:1.1rem;font-weight:700;margin-bottom:10px}
+.ending-text-m{font-size:0.78rem;color:var(--text-2);line-height:1.6;margin-bottom:20px}
+.ending-btn-m{padding:10px 24px;background:var(--accent);color:#1a1816;border:none;border-radius:var(--radius);font-size:0.85rem;font-weight:600;cursor:pointer}
+.ending-btn-m:active{opacity:0.8}
+.news-section{padding:10px 14px;margin:8px 0;background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius)}
+.news-title{font-size:0.68rem;font-weight:600;color:var(--accent);margin-bottom:6px}
+.news-item{font-size:0.64rem;color:var(--text-3);padding:2px 0}
+
 </style>
 </head>
 <body>
@@ -626,17 +641,6 @@ async function resetGame() {
 // ============================================================
 // TAB SWITCHING
 // ============================================================
-  // Trend
-  const trendEl = document.getElementById('mh-trend');
-  if (trendEl && gameState.trend) {
-    trendEl.textContent = `📐 当前趋势：${gameState.trend.name}（${gameState.trend.boost_attr}↑ / ${gameState.trend.penalty_attr}↓）`;
-    trendEl.style.display = '';
-  } else if (trendEl) trendEl.style.display = 'none';
-  // Ending
-  if (window._pendingEnding) { showEnding(window._pendingEnding); window._pendingEnding = null; }
-  switchTab(currentTab);
-}
-
 function switchTab(tab) {
   currentTab = tab;
   document.querySelectorAll('.tab-page').forEach(p => p.classList.remove('active'));
@@ -658,6 +662,14 @@ function renderAll() {
   document.getElementById('mh-avatar').textContent = (p.name||'林')[0];
   document.getElementById('mh-name').textContent = p.name || '—';
   document.getElementById('mh-sub').textContent = (gameState.title?.title||'') + ' · ' + (gameState.game_date||'');
+  // Trend
+  const trendEl = document.getElementById('mh-trend');
+  if (trendEl && gameState.trend) {
+    trendEl.textContent = `📐 当前趋势：${gameState.trend.name}（${gameState.trend.boost_attr}↑ / ${gameState.trend.penalty_attr}↓）`;
+    trendEl.style.display = '';
+  } else if (trendEl) trendEl.style.display = 'none';
+  // Ending
+  if (window._pendingEnding) { showEnding(window._pendingEnding); window._pendingEnding = null; }
   switchTab(currentTab);
 }
 
