@@ -1113,7 +1113,7 @@ def check_achievements(state, prev_stamina=None):
         unlock('first_project')
 
     return new_unlocks, unlocked
-def build_messages(state, player_action=None):
+def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee=0):
     player = state.get('player', {})
     attrs = state.get('attributes', {})
     npcs = state.get('npcs', [])
@@ -1122,7 +1122,7 @@ def build_messages(state, player_action=None):
     parts = [
         '# 游戏状态',
         f'当前日期: {get_game_date(state)}',
-        f'女主: {player.get("name","?")}, {player.get("age","?") + state.get("turn_count", 0) // 48}岁, {player.get("city","上海")}',
+        f'女主: {player.get("name","?")}, {int(player.get("age","0") or 0) + state.get("turn_count", 0) // 48}岁, {player.get("city","上海")}',
         f'职业: {player.get("origin","?")} → 目标: {player.get("goal","?")}',
         f'当前头衔: {state.get("title",{}).get("title","见习设计师")}（{state.get("title",{}).get("stage","萌芽期")}）',
         f'资源: {player.get("resources","?")}, 节奏: {player.get("pace","标准")}',
@@ -1444,6 +1444,7 @@ def api_action():
 
     # F-EXTRA: Forced rest when stamina depleted
     is_forced_rest = False
+    hospital_fee = 0
     if state.get('stamina', 80) <= 0:
         state['stamina'] = min(100, state['stamina'] + 30)
         hospital_fee = min(state.get('savings', 0), random.randint(1000, 3000))
@@ -1451,7 +1452,7 @@ def api_action():
         action_text = f'精力耗尽，强制休息，就医花费 {hospital_fee} 元'
         is_forced_rest = True
 
-    messages = build_messages(state, action_text)
+    messages = build_messages(state, action_text, is_forced_rest, hospital_fee)
 
     # Run attribute checks and inject results
     last_narrative = state['story_log'][-1].get('narrative', '') if state['story_log'] else ''
@@ -1534,7 +1535,7 @@ def api_action():
         'stamina': state['stamina'],
         'savings': state['savings'],
         'game_date': get_game_date(state),
-        'player_age': state.get('player', {}).get('age', 24) + state['turn_count'] // 48,
+        'player_age': int(state.get('player', {}).get('age', '24') or 24) + state['turn_count'] // 48,
         'title': state['title'],
         'npcs': state['npcs'],
         'company': state.get('company', {}),
@@ -1924,7 +1925,7 @@ def api_active_action():
     # Run all post-turn systems (same as api_action)
     arc_msg = detect_and_start_arc(state)
     challenge = check_career_challenge(state)
-    economy_event = process_monthly_economy(state)
+    economy_event = process_economy(state)
     crisis_event = check_savings_crisis(state)
     project_phase_hint = advance_project_phase(state)
     prev_stamina = state.get('_prev_stamina', state.get('stamina', 80))
@@ -1946,7 +1947,7 @@ def api_active_action():
         'stamina': state['stamina'],
         'savings': state['savings'],
         'game_date': get_game_date(state),
-        'player_age': state.get('player', {}).get('age', 24) + state['turn_count'] // 48,
+        'player_age': int(state.get('player', {}).get('age', '24') or 24) + state['turn_count'] // 48,
         'title': state['title'],
         'npcs': state['npcs'],
         'company': state.get('company', {}),
@@ -1963,8 +1964,12 @@ def api_active_action():
         'challenge': challenge,
         'npc_event': npc_event,
         'stamina_status': stamina_status,
+        'status_debuff': status_debuff,
         'trait': state.get('trait'),
-        'turn': turn
+        'turn': turn,
+        # Exclusive to active actions
+        'stamina_restored': stamina_restored,
+        'savings_spent': savings_spent
     })
 
 # ============================================================
