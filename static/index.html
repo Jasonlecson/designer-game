@@ -1664,7 +1664,10 @@ function renderDashboard() {
 
   // Choices
   const choicesEl = document.getElementById('event-choices');
-  if (last?.choices && last.choices.length > 0) {
+  const stamina = gameState.stamina || 80;
+  if (stamina <= 0) {
+    choicesEl.innerHTML = `<div style="background:var(--danger-bg);color:var(--danger);text-align:center;padding:16px;border-radius:var(--radius);font-weight:600;font-size:0.85rem">⚡ 精力耗尽 · 下回合将强制休息</div>`;
+  } else if (last?.choices && last.choices.length > 0) {
     let chHtml = '';
     last.choices.forEach(ch => {
       chHtml += `<button class="choice-btn" data-choice="${esc(ch.id)}" ${isProcessing?'disabled':''}>
@@ -2500,6 +2503,8 @@ switchScreen('cover-screen');
 document.addEventListener('click', function(e) {
   const btn = e.target.closest('#event-choices .choice-btn');
   if (btn && !btn.disabled && !isProcessing) {
+    // Block normal choices when stamina depleted — forced rest will trigger
+    if (gameState && gameState.stamina <= 0 && btn.dataset.choice !== '__action__') return;
     const choiceId = btn.getAttribute('data-choice');
     if (choiceId) makeChoice(choiceId);
     return;

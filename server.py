@@ -1108,7 +1108,10 @@ def build_messages(state, player_action=None):
     ]
 
     if player_action:
-        messages.append({'role': 'user', 'content': f'玩家刚才的行动: {player_action}\n\n请叙述这个选择带来的后果，并给出接下来的 2-3 个新选择。记住：每个回合代表约1周的时间。必须包含 choices 数组。只输出JSON。'})
+        if is_forced_rest:
+            messages.append({'role': 'user', 'content': '玩家精力耗尽，陷入强制休息。请叙述她倒下/被迫停下来的场景（150-200字），并给出 2-3 个恢复后的新选择。必须包含 choices 数组。只输出JSON。'})
+        else:
+            messages.append({'role': 'user', 'content': f'玩家刚才的行动: {player_action}\n\n请叙述这个选择带来的后果，并给出接下来的 2-3 个新选择。记住：每个回合代表约1周的时间。必须包含 choices 数组。只输出JSON。'})
     else:
         # Opening — customized based on origin
         origin = state.get('player', {}).get('origin', '')
@@ -1335,6 +1338,13 @@ def api_action():
     if trait_def.get('stamina_penalty'):
         state['stamina'] = max(0, state['stamina'] - trait_def.get('stamina_penalty', 0))
     applied_effects = apply_choice_effects(state, chosen_effect)
+
+    # F-EXTRA: Forced rest when stamina depleted
+    is_forced_rest = False
+    if state.get('stamina', 80) <= 0:
+        state['stamina'] = min(100, state['stamina'] + 30)
+        action_text = '精力耗尽，强制休息'
+        is_forced_rest = True
 
     messages = build_messages(state, action_text)
 
