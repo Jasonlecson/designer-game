@@ -95,6 +95,7 @@ _player_locks = {}
 _npc_interacted = {}       # {session_id: {npc_id: True}} — per-turn NPC interaction tracking (NOT persisted)
 _npc_event_log = {}        # {session_id: [(npc_name, action_text)]} — recent NPC interactions for LLM context
 _npc_spotlight = {}        # {session_id: {npc_name: remaining_turns}} — elevated visibility window after interaction
+_npc_pending_events = {}   # {session_id: {npc_id: event_text}} — AI-initiated NPC events awaiting player response
 
 def get_player_lock():
     pid = get_session_id()
@@ -1261,7 +1262,7 @@ def generate_npc_event(state):
     role = npc.get('role', '')
     events = NPC_ACTIVE_EVENTS.get(role, ['{name} 发来了一条消息'])
     text = _random.choice(events).replace('{name}', npc['name'])
-    return {'npc_name': npc['name'], 'text': text, 'turn': turn}
+    return {'npc_name': npc['name'], 'npc_id': npc['id'], 'text': text, 'turn': turn}
 
 # ============================================================
 # I2: Attribute Check — 属性检定
@@ -1853,6 +1854,12 @@ def api_action():
 
     # I1: NPC active event
     npc_event = generate_npc_event(state)
+    # Store for NPC tab response indicator
+    if npc_event:
+        pid = get_session_id()
+        if pid not in _npc_pending_events:
+            _npc_pending_events[pid] = {}
+        _npc_pending_events[pid][npc_event['npc_id']] = npc_event['text']
     # I7: Endings check
     ending = check_endings(state)
     # I8: Generate industry news (every 12 turns)
@@ -1864,6 +1871,7 @@ def api_action():
     with lock:
         state['_trend'] = trend
         state['_industry_news'] = get_cached_news(state)
+        state['_npc_pending'] = _npc_pending_events.get(get_session_id(), {})
         save_state(state)
     # S2: Get stamina status for response
     stamina_status, status_debuff = get_stamina_status(state['stamina'])
@@ -1898,6 +1906,7 @@ def api_action():
         'ending': ending,
         'trend': trend,
         'industry_news': get_cached_news(state),
+        'npc_pending': _npc_pending_events.get(get_session_id(), {}),
     })
 
 @app.route('/api/state', methods=['GET'])
@@ -2010,7 +2019,19 @@ def api_npc_interact():
 
     role = npc.get('role', '职场关系')
     interactions = NPC_INTERACTIONS.get(role, NPC_INTERACTIONS['职场关系'])
-    action = next((a for a in interactions if a['id'] == action_id), None)
+    action = None
+
+    # Handle special "respond to AI-initiated event" action
+    if action_id == 'respond_event':
+        pid = get_session_id()
+        if pid in _npc_pending_events and npc_id in _npc_pending_events[pid]:
+            event_text = _npc_pending_events[pid].pop(npc_id, '')
+            action = {'id': 'respond_event', 'text': f'回应：{event_text[:20]}...', 'effect': '表达+1', 'stamina_cost': 2}
+        else:
+            return jsonify({'error': '没有待回应的消息'}), 400
+    else:
+        action = next((a for a in interactions if a['id'] == action_id), None)
+
     if not action:
         return jsonify({'error': '无效的互动'}), 400
     stamina = state.get('stamina', 80)
@@ -2047,6 +2068,10 @@ def api_npc_interact():
     # Mark interaction and record for next turn's LLM context
     interacted[npc_id] = True
     push_npc_event(npc['name'], action['text'])
+    # Clear pending AI-initiated event for this NPC
+    pid = get_session_id()
+    if pid in _npc_pending_events:
+        _npc_pending_events[pid].pop(npc_id, None)
 
     lock = get_player_lock()
     with lock:
@@ -2076,6 +2101,22 @@ def api_npc_options():
     interactions = NPC_INTERACTIONS.get(role, NPC_INTERACTIONS['职场关系'])
     stamina = state.get('stamina', 80)
     options = []
+
+    # If NPC has a pending AI-initiated event, add a "回应" option first
+    pid = get_session_id()
+    pending = _npc_pending_events.get(pid, {})
+    if npc_id in pending:
+        event_text = pending[npc_id]
+        options.append({
+            'id': 'respond_event',
+            'text': f'回应：{event_text[:20]}...',
+            'effect': '表达+1',
+            'stamina_cost': 2,
+            'available': True,
+            'is_response': True,
+            'event_text': event_text,
+        })
+
     for a in interactions:
         opt = dict(a)
         opt['available'] = stamina >= a['stamina_cost']
@@ -2119,9 +2160,10 @@ def api_project():
             'start_turn': state.get('turn_count', 0)
         }
         state['current_project'] = proj
-        lock = get_player_lock()
-        with lock:
-            save_state(state)
+    lock = get_player_lock()
+    with lock:
+        state['_npc_pending'] = _npc_pending_events.get(get_session_id(), {})
+        save_state(state)
     # Auto-progress project quality based on attributes
     attrs = state.get('attributes', {})
     proj['quality'] = min(100, proj.get('quality', 0) + attrs.get('审美判断力', 5) - 3)
@@ -2158,15 +2200,25 @@ def api_portfolio_generate():
     if not project_entries:
         return jsonify({'entries': [], 'message': '还没有完成的项目'})
 
-    # Build prompt with project narratives
+    # Build prompt with project narratives + game date context
     project_text = '\n'.join([f'项目{i+1}（第{e["turn"]}回合）: {e.get("narrative","")[:200]}' for i, e in enumerate(project_entries)])
+    game_month = get_game_date(state)
     messages = [
-        {'role': 'system', 'content': '你是设计师的作品集编辑。根据项目叙述，为每个项目生成一个简洁的作品集条目。只输出纯JSON数组。'},
-        {'role': 'user', 'content': f'''根据以下项目经历，生成作品集条目。每个条目包含：name（项目名≤15字）、role（角色≤8字）、style（视觉风格≤10字）、highlight（一句话亮点≤20字）。
+        {'role': 'system', 'content': '你是资深设计师的作品集编辑。根据项目经历生成专业的作品集条目。只输出纯JSON数组。'},
+        {'role': 'user', 'content': f'''根据以下项目经历生成作品集条目。当前时间约{game_month}。
+
+每个条目包含：
+- name：项目名称（≤15字）
+- time：大致时间（基于回合数和{game_month}推算，如"2010年3月"）
+- client：客户/委托方（≤10字）
+- role：你的角色（≤8字）
+- style：视觉风格（≤10字）
+- highlight：一句话亮点（≤20字）
+- scene：项目场景/背景（≤30字，如"为某品牌新品发布设计全套视觉方案"）
 
 {project_text}
 
-只输出JSON数组，格式：[{{"name":"","role":"","style":"","highlight":""}}, ...]'''}
+只输出JSON数组，格式：[{{"name":"","time":"","client":"","role":"","style":"","highlight":"","scene":""}}, ...]'''}
     ]
     result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
     if error:
@@ -2307,7 +2359,13 @@ def api_active_action():
     state['_prev_stamina'] = state['stamina']
     milestone_done, milestone_reward = check_milestone(state)
     npc_event = generate_npc_event(state)
+    if npc_event:
+        pid = get_session_id()
+        if pid not in _npc_pending_events:
+            _npc_pending_events[pid] = {}
+        _npc_pending_events[pid][npc_event['npc_id']] = npc_event['text']
     stamina_status, status_debuff = get_stamina_status(state['stamina'])
+    # I7: Endings check (active_action)
 
     lock = get_player_lock()
     with lock:
@@ -2410,173 +2468,6 @@ def api_saves_delete():
     if os.path.exists(path):
         os.remove(path)
     return jsonify({'ok': True})
-
-@app.route('/api/action/stream', methods=['POST'])
-def api_action_stream():
-    '''SSE streaming version of api_action.'''
-    from flask import Response, stream_with_context
-    data = request.get_json(silent=True) or {}
-    cfg = load_config()
-    if not cfg.get('api_key'):
-        return jsonify({'error': '请先配置 API Key'}), 400
-
-    def generate():
-        state = load_state()
-        if not state:
-            yield f'data: {json.dumps({"error": "没有存档"})}\n\n'
-            return
-
-        choice_id = data.get('choice_id', '')
-        action_text = data.get('action', '')
-        npc_context = flush_npc_event_log()
-        get_npc_interactions().clear()
-        spotlight = tick_npc_spotlight()
-        chosen_effect = ''
-
-        if choice_id and not action_text:
-            last_entry = state['story_log'][-1] if state['story_log'] else None
-            if last_entry and last_entry.get('choices'):
-                for ch in last_entry['choices']:
-                    if ch['id'] == choice_id:
-                        action_text = ch['text']
-                        chosen_effect = ch.get('effects', [])
-                        break
-        if not action_text:
-            action_text = '玩家做出了选择'
-
-        origin_key = '应届生' if '应届' in state.get('player', {}).get('origin', '') else \
-                     '乙方执行' if '乙方' in state.get('player', {}).get('origin', '') else \
-                     '甲方品牌' if '甲方' in state.get('player', {}).get('origin', '') else \
-                     '自由职业' if '自由' in state.get('player', {}).get('origin', '') else \
-                     '印刷厂' if '印刷' in state.get('player', {}).get('origin', '') else '自定义'
-        trait_def = ORIGIN_TRAITS.get(origin_key, ORIGIN_TRAITS['自定义'])
-        if trait_def.get('stamina_penalty'):
-            state['stamina'] = max(0, state.get('stamina', 80) - trait_def.get('stamina_penalty', 0))
-        if trait_def.get('stamina_discount'):
-            state['stamina'] = min(100, state.get('stamina', 80) + trait_def['stamina_discount'])
-
-        apply_effect_xp(state, chosen_effect)
-
-        is_forced_rest = False
-        hospital_fee = 0
-        if state.get('stamina', 80) <= 0:
-            state['stamina'] = min(100, state['stamina'] + 30)
-            hospital_fee = min(state.get('savings', 0), random.randint(1000, 3000))
-            state['savings'] = max(0, state.get('savings', 3000) - hospital_fee)
-            action_text = f'精力耗尽，强制休息，就医花费 {hospital_fee} 元'
-            is_forced_rest = True
-
-        messages = build_messages(state, action_text, is_forced_rest, hospital_fee)
-        if npc_context or spotlight:
-            npc_lines = []
-            for n_name, n_act in npc_context:
-                npc_lines.append(f'  · 本回合和{n_name}互动：{n_act}')
-            if spotlight:
-                npc_lines.append(f'  · 以下人物最近与你接触过，可能在生活中自然出现：')
-                for s_name, s_turns in spotlight:
-                    npc_lines.append(f'    - {s_name}（已接触，剩余活跃{s_turns}回合）')
-            npc_hint = '[系统提示] 请在叙事中自然地融入以下信息。如果有机会，让最近接触过的人物在场景中自然地出现：\n' + '\n'.join(npc_lines)
-            messages.append({'role': 'user', 'content': npc_hint})
-
-        last_narrative = state['story_log'][-1].get('narrative', '') if state['story_log'] else ''
-        check_results = run_attribute_checks(state, last_narrative, state.get('story_log', []))
-        if check_results:
-            check_text = '\n\n[D M 属性检定结果 - 必须融入叙事]\n'
-            for cr in check_results:
-                check_text += f'  {cr["trigger"]}检定: {cr["attr"]}({cr["value"]}) + D10({cr["roll"]}) = {cr["total"]} vs 难度{cr["difficulty"]} → {"✅成功" if cr["success"] else "❌失败"}\n'
-                check_text += f'  叙事方向: {cr["message"]}\n'
-            messages.append({'role': 'user', 'content': check_text})
-
-        # Stream LLM narrative tokens
-        narrative_buffer = ''
-        result = {}
-        for chunk, err in call_llm_stream(messages, cfg['api_base'], cfg['api_key'], cfg['model']):
-            if err:
-                yield f'data: {json.dumps({"error": err})}\n\n'
-                return
-            if isinstance(chunk, str):
-                narrative_buffer += chunk
-                yield f'data: {json.dumps({"token": chunk})}\n\n'
-            else:
-                result = chunk
-
-        if not result:
-            result = validate_and_fix_result({}, state['turn_count'], state['attributes'])
-
-        result = validate_and_fix_result(result, state['turn_count'], state['attributes'])
-        if result.get('npc_updates'):
-            state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
-        if result.get('company_update'):
-            apply_company_update(state, result['company_update'])
-
-        turn = state['turn_count'] + 1
-        apply_trend_to_xp(state, result.get('attr_trend', {}))
-        state['attributes'] = xp_to_attrs(state)
-
-        entry = {
-            'turn': turn,
-            'player_action': action_text,
-            'narrative': result['narrative'],
-            'choices': result['choices'],
-            'atmosphere': result.get('atmosphere', ''),
-            'attr_display': dict(state['attributes']),
-            'event_tag': result.get('event_tag', '日常'),
-        }
-        state['story_log'].append(entry)
-        state['stamina'] = max(0, min(100, state.get('stamina', 80) + result.get('stamina_change', -5)))
-        state['savings'] = max(0, state.get('savings', 3000) + result.get('savings_change', 0))
-        state['turn_count'] = turn
-
-        prev_stamina = state.get('_prev_stamina', state.get('stamina', 80))
-        state['title'] = calculate_title(state['attributes'])
-        new_ach, unlocked = check_achievements(state, prev_stamina)
-        state['unlocked_achievements'] = list(unlocked)
-        state['_prev_stamina'] = state['stamina']
-
-        arc_msg = detect_and_start_arc(state)
-        challenge = check_career_challenge(state)
-        economy_event = process_economy(state)
-        crisis_event = check_savings_crisis(state)
-        project_phase_hint = advance_project_phase(state)
-        milestone_done, milestone_reward = check_milestone(state)
-        if milestone_done:
-            new_ach, unlocked = check_achievements(state, prev_stamina)
-            state['unlocked_achievements'] = list(unlocked)
-        npc_event = generate_npc_event(state)
-        stamina_status, status_debuff = get_stamina_status(state['stamina'])
-        ending = check_endings(state)
-        generate_industry_news(state, cfg)
-        trend = get_current_trend(state)
-
-        lock = get_player_lock()
-        with lock:
-            save_state(state)
-
-        # Build final response
-        new_achievements_list = [a for a in ACHIEVEMENTS if a['id'] in new_ach]
-        full_state = {
-            'ok': True, 'entry': entry, 'attributes': state['attributes'],
-            'stamina': state['stamina'], 'savings': state['savings'],
-            'game_date': get_game_date(state),
-            'player_age': int(state.get('player', {}).get('age', '24') or 24) + state['turn_count'] // 48,
-            'title': state['title'], 'npcs': state['npcs'],
-            'company': state.get('company', {}), 'career_history': state.get('career_history', []),
-            'unlocked_achievements': list(unlocked),
-            'new_achievements': new_achievements_list,
-            'milestone': state.get('milestone'), 'milestone_done': milestone_done,
-            'milestone_reward': milestone_reward, 'economy_event': economy_event,
-            'crisis_event': crisis_event, 'arc_msg': arc_msg,
-            'project_phase_hint': project_phase_hint, 'challenge': challenge,
-            'npc_event': npc_event, 'stamina_status': stamina_status,
-            'status_debuff': status_debuff, 'trait': state.get('trait'), 'turn': turn
-        }
-        yield f'data: {json.dumps({"done": True, "state": full_state}, ensure_ascii=False)}\n\n'
-
-    return Response(
-        stream_with_context(generate()),
-        mimetype='text/event-stream',
-        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
-    )
 
 @app.route('/api/ending/resolve', methods=['POST'])
 def api_ending_resolve():

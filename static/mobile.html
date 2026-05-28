@@ -785,18 +785,21 @@ function renderNPCTab() {
   if (!gameState) return;
   const el = document.getElementById('tab-npc');
   const npcs = gameState.npcs || [];
+  const pending = gameState._npc_pending || {};
   if (npcs.length === 0) {
     el.innerHTML = '<div class="empty-state"><span class="empty-icon">👥</span>还没有遇到任何人</div>';
     return;
   }
   let html = '<div class="npc-list">';
   npcs.forEach((n,i) => {
+    const badge = pending[n.id] ? `<div style="font-size:0.6rem;color:var(--accent);margin-top:3px">📨 ${esc(pending[n.id].substring(0,25))}</div>` : '';
     html += `<div class="npc-card" data-npc-id="${esc(n.id)}">
       <div class="npc-avatar" style="background:${AVATAR_COLORS[i%6]}">${n.name[0]}</div>
       <div class="npc-info">
         <div class="npc-name">${esc(n.name)}</div>
         <div class="npc-role">${esc(n.role)}</div>
         <div class="npc-rel">${esc(n.relation||'待展开')}</div>
+        ${badge}
       </div>
       <span style="color:var(--text-3)">›</span>
     </div>`;
@@ -923,15 +926,15 @@ async function makeChoice(choiceId) {
   if (isProcessing) return;
   if (gameState && gameState.stamina <= 0) return;
   isProcessing = true;
-  const el = document.getElementById('tab-story');
-  el.innerHTML = '<div class="narrative-card"><div class="narrative-text"><div class="loading"><div class="dots"><span></span><span></span><span></span></div></div></div></div>';
-  const nel = el.querySelector('.narrative-text');
-  let buf = '';
-  await API.streamAction(choiceId,
-    token => { buf += token; if (nel) nel.innerHTML = formatNarrative(buf); },
-    state => { processActionResponse(state); isProcessing = false; renderAll(); },
-    err => { if (nel) nel.innerHTML = `<div style="color:var(--danger);text-align:center;padding:20px">${esc(err)}</div>`; isProcessing = false; }
-  );
+  setLoading(true);
+  try {
+    const d = await API.doAction(choiceId);
+    processActionResponse(d);
+  } catch(e) {
+    setLoading(false, esc(e.message));
+  }
+  isProcessing = false;
+  renderAll();
 }
 
 async function doActiveAction(actionKey) {
@@ -953,6 +956,29 @@ function setLoading(on, msg) {
   if (!el) return;
   if (on) el.innerHTML = '<div class="loading"><div class="dots"><span></span><span></span><span></span></div></div>';
   else if (msg) el.innerHTML = `<div style="color:var(--danger);text-align:center;padding:20px">${msg}</div>`;
+}
+
+// ============================================================
+// FEEDBACK
+// ============================================================
+async function showFeedback() {
+  let html = `<div class="modal-handle"></div>`;
+  html += `<div class="modal-title">💬 反馈</div>`;
+  html += `<div style="font-size:0.74rem;color:var(--text-2);margin-bottom:12px">有什么想法、建议或 bug？</div>`;
+  html += `<textarea id="fb-text" style="width:100%;height:80px;padding:10px;border:1px solid var(--border);border-radius:var(--radius);background:var(--bg);color:var(--text-1);font-size:0.82rem;font-family:var(--font-sans);resize:vertical" placeholder="请输入反馈..."></textarea>`;
+  html += `<button class="btn btn-primary btn-wide" style="margin-top:10px" onclick="submitFeedback()">发送反馈</button>`;
+  html += `<div class="modal-close" onclick="closeModal()">取消</div>`;
+  openModal(html);
+}
+
+async function submitFeedback() {
+  const text = document.getElementById('fb-text')?.value?.trim();
+  if (!text) { alert('请输入反馈内容'); return; }
+  try {
+    await API.sendFeedback(text, gameState?.turn_count || 0, gameState?.player?.name || '');
+    closeModal();
+    showNotification('milestone', '反馈已提交，感谢！');
+  } catch(e) { alert('提交失败'); }
 }
 
 // ============================================================

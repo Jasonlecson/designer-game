@@ -23,42 +23,6 @@ const API = {
   newGame(data)    { return this.fetch('/api/new_game', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data) }); },
   getState()       { return this.fetch('/api/state'); },
   doAction(choiceId){ return this.fetch('/api/action', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({choice_id:choiceId}) }); },
-  async streamAction(choiceId, onToken, onDone, onError) {
-    try {
-      const ctrl = new AbortController();
-      const t = setTimeout(() => ctrl.abort(), 120000);
-      const r = await fetch('/api/action/stream', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({choice_id:choiceId}),
-        signal:ctrl.signal
-      });
-      clearTimeout(t);
-      if (!r.ok) { onError('HTTP ' + r.status); return; }
-      const reader = r.body.getReader();
-      const decoder = new TextDecoder();
-      let buffer = '';
-      while (true) {
-        const {done, value} = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, {stream:true});
-        const lines = buffer.split('\n');
-        buffer = lines.pop();
-        for (const line of lines) {
-          if (line.startsWith('data: ')) {
-            try {
-              const data = JSON.parse(line.slice(6));
-              if (data.error) { onError(data.error); return; }
-              if (data.token) { onToken(data.token); }
-              else if (data.done) { onDone(data.state); return; }
-            } catch(e) {}
-          }
-        }
-      }
-    } catch(e) {
-      if (e.name === 'AbortError') onError('请求超时');
-      else onError(e.message);
-    }
-  },
   activeAction(action, attr) { return this.fetch('/api/active_action', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({action, attr}) }); },
   getNPCs(npcId)   { return this.fetch('/api/npc/options', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({npc_id:npcId}) }); },
   doNPC(npcId, actionId) { return this.fetch('/api/npc/interact', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({npc_id:npcId, action_id:actionId}) }); },
@@ -166,6 +130,7 @@ function updateGameState(d) {
   if (d.status_debuff) gameState.status_debuff = d.status_debuff;
   if (d.trait) gameState.trait = d.trait;
   if (d.turn) gameState.turn_count = d.turn;
+  if (d.npc_pending) gameState._npc_pending = d.npc_pending;
 }
 
 // ========== Utilities ==========

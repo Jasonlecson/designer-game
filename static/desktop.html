@@ -598,8 +598,9 @@ function renderAll() {
 
   // Sidebar NPCs
   const npcs = gameState.npcs||[];
+  const pending = gameState._npc_pending || {};
   const sn = document.getElementById('sb-npcs');
-  sn.innerHTML = npcs.slice(0,6).map((n,i)=>`<div class="npc-item"><div class="npc-dot" style="background:${AVATAR_COLORS[i%6]}">${n.name[0]}</div><div class="npc-info"><div class="npc-name">${esc(n.name)}</div><div class="npc-role">${esc(n.role)}</div></div></div>`).join('')||'<span style="color:var(--text-sidebar-dim);font-size:0.68rem">暂无</span>';
+  sn.innerHTML = npcs.slice(0,6).map((n,i)=>`<div class="npc-item"><div class="npc-dot" style="background:${AVATAR_COLORS[i%6]}">${n.name[0]}</div><div class="npc-info"><div class="npc-name">${esc(n.name)}${pending[n.id]?' <span style="color:var(--accent-light);font-size:0.6rem">📨</span>':''}</div><div class="npc-role">${esc(n.role)}</div></div></div>`).join('')||'<span style="color:var(--text-sidebar-dim);font-size:0.68rem">暂无</span>';
 
   // Milestone
   const ms = gameState.milestone;
@@ -716,14 +717,17 @@ function renderLog(tc) {
 // ============================================================
 function renderNetwork(tc) {
   const npcs = gameState.npcs||[];
+  const pending = gameState._npc_pending || {};
   if(npcs.length===0){tc.innerHTML='<div class="empty-log"><span class="empty-icon">👥</span>还没有遇到任何人</div>';return}
   let html='<div class="npc-grid">';
   npcs.forEach((n,i)=>{
+    const badge = pending[n.id] ? `<div style="font-size:0.6rem;color:var(--accent);margin-top:4px">📨 ${esc(pending[n.id].substring(0,20))}...</div>` : '';
     html+=`<div class="npc-card" onclick="showNPCSheet('${n.id}')">
       <div class="npc-card-avatar" style="background:${AVATAR_COLORS[i%6]}">${n.name[0]}</div>
       <div class="npc-card-name">${esc(n.name)}</div>
       <div class="npc-card-role">${esc(n.role)}</div>
       <div class="npc-card-rel">${esc(n.relation||'待展开')}</div>
+      ${badge}
     </div>`;
   });
   html+='</div>';
@@ -789,7 +793,7 @@ async function loadPortfolio(){
     const colors=['var(--accent)','var(--success)','#7b8fa1','#c4a43e','#8e6b9e','#c4755e'];
     grid.innerHTML = entries.length===0
       ?'<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-tertiary);font-size:0.75rem">还没有完成的作品</div>'
-      :entries.map((e,i)=>`<div class="pt-card"><div class="pt-card-visual" style="background:linear-gradient(135deg,${colors[i%6]}22,${colors[(i+1)%6]}11)">🖼️</div><div class="pt-card-name">${esc(e.name||'')}</div><div class="pt-card-role">${esc(e.role||'')}</div><div class="pt-card-style">${esc(e.style||'')}</div><div class="pt-card-highlight">${esc(e.highlight||'')}</div></div>`).join('');
+      :entries.map((e,i)=>`<div class="pt-card"><div class="pt-card-visual" style="background:linear-gradient(135deg,${colors[i%6]}22,${colors[(i+1)%6]}11)">🖼️</div><div class="pt-card-name">${esc(e.name||'')}</div><div class="pt-card-time" style="font-size:0.6rem;color:var(--text-tertiary)">${esc(e.time||'')} · ${esc(e.client||'')}</div><div class="pt-card-role">${esc(e.role||'')}</div><div class="pt-card-style">${esc(e.style||'')}</div><div class="pt-card-scene" style="font-size:0.62rem;color:var(--text-tertiary);margin-top:2px">${esc(e.scene||'')}</div><div class="pt-card-highlight">${esc(e.highlight||'')}</div></div>`).join('');
   }catch(e){}
 }
 
@@ -806,16 +810,9 @@ async function loadAchievements(){
 async function makeChoice(choiceId){
   if(isProcessing)return;
   if(gameState&&gameState.stamina<=0)return;
-  isProcessing=true;
-  const tc=document.getElementById('tab-content');
-  tc.innerHTML='<div class="dashboard-content"><div class="narrative-box" id="narrative-stream"><div class="loading"><div class="dots"><span></span><span></span><span></span></div></div></div></div>';
-  const nel=document.getElementById('narrative-stream');
-  let buf='';
-  await API.streamAction(choiceId,
-    token=>{buf+=token;if(nel)nel.innerHTML=formatNarrative(buf)},
-    state=>{processActionResponse(state);isProcessing=false;renderAll()},
-    err=>{if(nel)nel.innerHTML=`<div style="color:var(--danger);text-align:center;padding:20px">${esc(err)}</div>`;isProcessing=false}
-  );
+  isProcessing=true;setLoading(true);
+  try{const d=await API.doAction(choiceId);processActionResponse(d);isProcessing=false;renderAll()}
+  catch(e){setLoading(false,esc(e.message));isProcessing=false}
 }
 
 async function doActiveAction(actionKey){
