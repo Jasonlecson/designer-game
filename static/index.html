@@ -1218,6 +1218,7 @@ body {
       <div class="topbar-left">
         <span class="topbar-location" id="tb-location">上海</span>
         <span class="topbar-turn" id="tb-turn">第 1 回合</span>
+        <span class="topbar-date" id="tb-date" style="font-size:0.72rem;color:var(--text-tertiary);font-style:italic">2010年01月</span>
         <span class="topbar-event-tag" id="tb-tag" style="background:var(--accent-bg);color:var(--accent)">游戏开始</span>
         <div class="topbar-tabs">
           <button class="tab-btn active" onclick="switchTab('dashboard')">工作台</button>
@@ -1548,7 +1549,11 @@ function renderAll() {
   // Sidebar
   document.getElementById('sb-avatar').textContent = (player.name || '林')[0];
   document.getElementById('sb-name').textContent = player.name || '—';
-  document.getElementById('sb-origin').textContent = player.origin || '—';
+  document.getElementById('tb-location').textContent = player.city || '上海';
+  document.getElementById('tb-turn').textContent = `第 ${gameState.turn_count} 回合`;
+  document.getElementById('tb-date').textContent = gameState.game_date || '';
+  // Age display
+  document.getElementById('sb-origin').textContent = `${player.origin || '—'} · ${gameState.player_age || player.age || 24}岁`;
   const company = gameState.company || {};
   document.getElementById('sb-company').textContent = company.name ? `${company.name} · ${company.position || '设计师'}` : '—';
   const title = gameState.title || { title: '见习设计师', stage: '萌芽期' };
@@ -2004,6 +2009,8 @@ async function makeChoice(choiceId) {
     if (d.attributes) gameState.attributes = d.attributes;
     if (d.stamina !== undefined) gameState.stamina = d.stamina;
     if (d.savings !== undefined) gameState.savings = d.savings;
+    if (d.game_date) gameState.game_date = d.game_date;
+    if (d.player_age !== undefined) gameState.player_age = d.player_age;
     if (d.title) gameState.title = d.title;
     if (d.npcs) gameState.npcs = d.npcs;
     if (d.company) gameState.company = d.company;
@@ -2228,6 +2235,8 @@ async function doActiveAction(actionKey) {
     if (d.attributes) gameState.attributes = d.attributes;
     if (d.stamina !== undefined) gameState.stamina = d.stamina;
     if (d.savings !== undefined) gameState.savings = d.savings;
+    if (d.game_date) gameState.game_date = d.game_date;
+    if (d.player_age !== undefined) gameState.player_age = d.player_age;
     if (d.title) gameState.title = d.title;
     if (d.npcs) gameState.npcs = d.npcs;
     if (d.company) gameState.company = d.company;

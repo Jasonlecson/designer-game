@@ -198,9 +198,9 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 
 ## choice.effect 规则
 - effect 格式："属性简称±数字 属性简称±数字"，空格分隔
-- effect 格式："属性简称±级数"，空格分隔。+1 表示加一个等级所需的经验值（等级越高，所需经验越多）
-- 必须至少包含一个属性变化，涨属性必须伴随代价
-- 示例: "审美+1"/"执行-1 精力-10"/"商业+1 表达+1 精力-5"
+- effect 格式："属性简称±级数"，空格分隔。+1 固定加 50 经验值
+- 必须至少包含一个属性变化，涨属性必须伴随代价（精力消耗、储蓄消耗、或其他属性下降）
+- 示例: "审美+1 精力-8"/"执行-1"/"商业+2 表达+1 精力-10"
 
 ## company_update 规则
 - 游戏开场时必须初始化公司信息（action: "入职"）
@@ -469,7 +469,7 @@ def xp_to_attrs(state):
 
 def apply_effect_xp(state, effect_str):
     '''Apply choice effect like '审美+1 执行-2' directly to XP.
-    +1 means add enough XP for 1 level at current level.
+    +1 means add XP_PER_EFFECT_POINT XP per point (50 XP per +1).
     Returns {attr: level_change} for notification.'''
     level_changes = {}
     if not effect_str:
@@ -478,6 +478,7 @@ def apply_effect_xp(state, effect_str):
         '审美': '审美判断力', '执行': '执行能力', '商业': '商业思维',
         '表达': '表达能力', '创意': '创意深度', '作品': '作品集厚度'
     }
+    XP_PER_EFFECT_POINT = 50  # Fixed XP per +1 in effect string
     parts = effect_str.strip().split()
     xp = state.get('attribute_xp', {})
     for part in parts:
@@ -487,11 +488,7 @@ def apply_effect_xp(state, effect_str):
                     change = int(part[len(short):])
                 except (ValueError, IndexError):
                     continue
-                current_level = xp_to_level(xp.get(full, 0))
-                if change > 0:
-                    xp_delta = xp_for_level_up(current_level) * change
-                else:
-                    xp_delta = xp_for_level_up(max(1, current_level + change)) * change
+                xp_delta = XP_PER_EFFECT_POINT * change
                 old_level = xp_to_level(xp.get(full, 0))
                 xp[full] = xp.get(full, 0) + xp_delta
                 new_level = xp_to_level(xp[full])
@@ -1117,7 +1114,8 @@ def build_messages(state, player_action=None):
 
     parts = [
         '# 游戏状态',
-        f'女主: {player.get("name","?")}, {player.get("age","?")}岁, {player.get("city","上海")}',
+        f'当前日期: {get_game_date(state)}',
+        f'女主: {player.get("name","?")}, {player.get("age","?") + state.get("turn_count", 0) // 48}岁, {player.get("city","上海")}',
         f'职业: {player.get("origin","?")} → 目标: {player.get("goal","?")}',
         f'当前头衔: {state.get("title",{}).get("title","见习设计师")}（{state.get("title",{}).get("stage","萌芽期")}）',
         f'资源: {player.get("resources","?")}, 节奏: {player.get("pace","标准")}',
@@ -1348,7 +1346,7 @@ def api_new_game():
         'stamina': 80,
         'savings': 3000,
         'attribute_xp': {k: level_to_xp_target(v) for k, v in attributes.items()},
-        'start_date': datetime.now().isoformat(),
+        'start_date': '2010-01-01T00:00:00',
         'created_at': datetime.now().isoformat(),
     }
     # I3: Assign trait based on origin
@@ -1528,6 +1526,8 @@ def api_action():
         'attributes': state['attributes'],
         'stamina': state['stamina'],
         'savings': state['savings'],
+        'game_date': get_game_date(state),
+        'player_age': state.get('player', {}).get('age', 24) + state['turn_count'] // 48,
         'title': state['title'],
         'npcs': state['npcs'],
         'company': state.get('company', {}),
@@ -1938,6 +1938,8 @@ def api_active_action():
         'attributes': state['attributes'],
         'stamina': state['stamina'],
         'savings': state['savings'],
+        'game_date': get_game_date(state),
+        'player_age': state.get('player', {}).get('age', 24) + state['turn_count'] // 48,
         'title': state['title'],
         'npcs': state['npcs'],
         'company': state.get('company', {}),
