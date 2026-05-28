@@ -169,6 +169,14 @@ function updateGameState(d) {
 }
 
 // ========== Utilities ==========
+function xpToLevel(xp) { return Math.floor(Math.sqrt(Math.max(0, xp) / 20)); }
+function xpProgress(xp) {
+  if (!xp || xp <= 0) return 0;
+  const lvl = xpToLevel(xp);
+  const xpAtLvl = lvl * lvl * 20;
+  const xpNext = (lvl + 1) * (lvl + 1) * 20;
+  return Math.min(100, Math.max(0, ((xp - xpAtLvl) / (xpNext - xpAtLvl)) * 100));
+}
 function esc(s) {
   if (!s) return '';
   const div = document.createElement('div');

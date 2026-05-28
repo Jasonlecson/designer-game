@@ -153,7 +153,8 @@ body{
 .attr-value.mid{color:var(--accent-light)}
 .attr-value.low{color:#d4846a}
 .attr-bar{height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden}
-.attr-fill{height:100%;border-radius:2px;transition:width 0.6s var(--ease-out)}
+.attr-fill{height:100%;border-radius:2px;transition:width 0.6s var(--ease-out);position:relative}
+.attr-fill-xp{position:absolute;top:0;left:0;height:100%;border-radius:2px;background:rgba(255,255,255,0.25);transition:width 0.8s var(--ease-out)}
 .attr-fill.high{background:var(--success)}
 .attr-fill.mid{background:var(--accent-light)}
 .attr-fill.low{background:#d4846a}
@@ -585,10 +586,13 @@ function renderAll() {
 
   // Sidebar attrs
   const al = document.getElementById('sb-attrs');
+  const xp = gameState.attribute_xp || {};
   let ah='';
   for(const[k,v] of Object.entries(attrs)){
     const cls = attrClass(v);
-    ah+=`<div><div class="attr-header"><span class="attr-name">${ATTR_ICONS[k]||''} ${k}</span><span class="attr-value ${cls}">${v}</span></div><div class="attr-bar"><div class="attr-fill ${cls}" style="width:${(v/20*100).toFixed(1)}%"></div></div></div>`;
+    const lvlW = (v/20*100).toFixed(1);
+    const xpBar = xp[k] ? `width:${xpProgress(xp[k]).toFixed(1)}%` : 'width:0';
+    ah+=`<div><div class="attr-header"><span class="attr-name">${ATTR_ICONS[k]||''} ${k}</span><span class="attr-value ${cls}">${v}</span></div><div class="attr-bar"><div class="attr-fill ${cls}" style="width:${lvlW}%"><div class="attr-fill-xp" style="${xpBar}"></div></div></div></div>`;
   }
   al.innerHTML=ah;
 

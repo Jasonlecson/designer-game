@@ -316,7 +316,8 @@ body{
 .stat-name{font-size:0.78rem;color:var(--text-2)}
 .stat-val{font-size:0.92rem;font-weight:700}
 .stat-bar{height:5px;background:rgba(255,255,255,0.06);border-radius:3px;overflow:hidden}
-.stat-fill{height:100%;border-radius:3px;transition:width 0.5s ease}
+.stat-fill{height:100%;border-radius:3px;transition:width 0.5s ease;position:relative}
+.stat-fill-xp{position:absolute;top:0;left:0;height:100%;border-radius:3px;background:rgba(255,255,255,0.2);transition:width 0.8s ease}
 .stat-resources{
   margin-top:20px;padding-top:16px;border-top:1px solid var(--border);
   display:flex;gap:12px;
@@ -847,12 +848,14 @@ function renderStatsTab() {
   const ms = gameState.milestone;
   let html = '<div class="stats-grid">';
 
+  const xp = gameState.attribute_xp || {};
   ATTR_NAMES.forEach(k => {
     const v = attrs[k] || 0;
     const color = attrColor(v);
+    const xpBar = xp[k] ? `width:${xpProgress(xp[k]).toFixed(1)}%` : 'width:0';
     html += `<div class="stat-row">
       <div class="stat-header"><span class="stat-name">${ATTR_ICONS[k]} ${k}</span><span class="stat-val" style="color:${color}">${v}</span></div>
-      <div class="stat-bar"><div class="stat-fill" style="width:${(v/20*100).toFixed(1)}%;background:${color}"></div></div>
+      <div class="stat-bar"><div class="stat-fill" style="width:${(v/20*100).toFixed(1)}%;background:${color}"><div class="stat-fill-xp" style="${xpBar}"></div></div></div>
     </div>`;
   });
   html += '</div>';
