@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 '平面设计师职业生涯模拟器 - 游戏服务器 v2'
 
-import json, os, random, traceback, uuid
+import json, os, random, traceback, uuid, threading
 from datetime import datetime, timedelta
 from flask import Flask, request, jsonify, send_from_directory, session
 
@@ -90,6 +90,60 @@ def save_state(state):
         json.dump(state, f, ensure_ascii=False, indent=2)
     os.replace(tmp, path)
 
+# Per-player thread lock — prevents concurrent write conflicts
+_player_locks = {}
+_npc_interacted = {}       # {session_id: {npc_id: True}} — per-turn NPC interaction tracking (NOT persisted)
+_npc_event_log = {}        # {session_id: [(npc_name, action_text)]} — recent NPC interactions for LLM context
+_npc_spotlight = {}        # {session_id: {npc_name: remaining_turns}} — elevated visibility window after interaction
+
+def get_player_lock():
+    pid = get_session_id()
+    if pid not in _player_locks:
+        _player_locks[pid] = threading.Lock()
+    return _player_locks[pid]
+
+def get_npc_interactions():
+    pid = get_session_id()
+    if pid not in _npc_interacted:
+        _npc_interacted[pid] = {}
+    return _npc_interacted[pid]
+
+def flush_npc_event_log():
+    pid = get_session_id()
+    events = _npc_event_log.pop(pid, [])
+    return events
+
+def push_npc_event(npc_name, action_text):
+    pid = get_session_id()
+    if pid not in _npc_event_log:
+        _npc_event_log[pid] = []
+    _npc_event_log[pid].append((npc_name, action_text))
+    # Grant spotlight
+    set_npc_spotlight(npc_name)
+
+def set_npc_spotlight(npc_name, turns=4):
+    pid = get_session_id()
+    if pid not in _npc_spotlight:
+        _npc_spotlight[pid] = {}
+    _npc_spotlight[pid][npc_name] = max(_npc_spotlight[pid].get(npc_name, 0), turns)
+
+def tick_npc_spotlight():
+    '''Decrement spotlight counters. Returns list of (name, remaining_turns) still in spotlight.'''
+    pid = get_session_id()
+    if pid not in _npc_spotlight:
+        return []
+    active = []
+    expired = []
+    for name, turns in list(_npc_spotlight[pid].items()):
+        if turns <= 1:
+            expired.append(name)
+        else:
+            _npc_spotlight[pid][name] = turns - 1
+            active.append((name, turns - 1))
+    for name in expired:
+        del _npc_spotlight[pid][name]
+    return active
+
 # ============================================================
 # Config (shared — one server, one API key)
 # ============================================================
@@ -171,9 +225,9 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 {
   "narrative": "用第二人称「你」叙述本回合剧情，150-300字，生动具体",
   "choices": [
-    {"id": "A", "text": "选项A（≤20字）", "hint": "短期后果（≤12字）", "effect": "审美+1 执行-1"},
-    {"id": "B", "text": "选项B（≤20字）", "hint": "短期后果（≤12字）", "effect": "商业+1"},
-    {"id": "C", "text": "选项C（≤20字）", "hint": "短期后果（≤12字）", "effect": "表达+1 精力+15"}
+    {"id": "A", "text": "选项A（≤20字）", "hint": "短期后果（≤12字）", "effects": [{"attr": "审美判断力", "delta": 1, "text": "审美+1"}, {"attr": "执行能力", "delta": -1, "text": "执行-1"}]},
+    {"id": "B", "text": "选项B（≤20字）", "hint": "短期后果（≤12字）", "effects": [{"attr": "商业思维", "delta": 1, "text": "商业+1"}]},
+    {"id": "C", "text": "选项C（≤20字）", "hint": "短期后果（≤12字）", "effects": [{"attr": "表达能力", "delta": 1, "text": "表达+1"}, {"attr": "stamina", "delta": 15, "text": "精力+15"}]}
   ],
   "atmosphere": "场景氛围（≤10字）",
   "attr_trend": {"审美判断力": "up", "执行能力": "flat", "商业思维": "up", "表达能力": "flat", "创意深度": "flat", "作品集厚度": "up"},
@@ -199,11 +253,13 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 - 加班、改稿、提案通常消耗精力；休息、度假、完成项目获得恢复
 - 完成项目、升职带来储蓄增长；被裁、日常开销带来储蓄减少
 
-## choice.effect 规则
-- effect 格式："属性简称±数字 属性简称±数字"，空格分隔
-- effect 格式："属性简称±级数"，空格分隔。+1 固定加 50 经验值
-- 必须至少包含一个属性变化，涨属性必须伴随代价（精力消耗、储蓄消耗、或其他属性下降）
-- 示例: "审美+1 精力-8"/"执行-1"/"商业+2 表达+1 精力-10"
+## choice.effects 规则（结构化数组）
+- effects 是 JSON 数组，每个元素包含：attr（属性名）、delta（变化量）、text（显示文本）
+- 属性名使用全称：审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度
+- 精力变化用 attr: "stamina"，储蓄变化用 attr: "savings"
+- +1 固定加 50 经验值，-1 固定减 50 经验值
+- 必须至少包含一个核心属性变化，涨属性必须伴随代价
+- 示例: [{"attr": "审美判断力", "delta": 1, "text": "审美+1"}, {"attr": "stamina", "delta": -8, "text": "精力-8"}]
 
 ## company_update 规则
 - 游戏开场时必须初始化公司信息（action: "入职"）
@@ -250,6 +306,51 @@ def generate_npcs():
 # ============================================================
 # LLM Call
 # ============================================================
+def call_llm_stream(messages, api_base, api_key, model):
+    '''Call LLM with streaming, yields text chunks.'''
+    import requests
+    try:
+        headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
+        payload = {
+            'model': model,
+            'messages': messages,
+            'temperature': 0.85,
+            'max_tokens': 1500,
+            'stream': True
+        }
+        resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120, stream=True)
+        if resp.status_code >= 400:
+            payload.pop('response_format', None)
+            resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120, stream=True)
+        if resp.status_code != 200:
+            yield None, f'API Error {resp.status_code}'
+            return
+        full_content = ''
+        for line in resp.iter_lines():
+            if not line:
+                continue
+            line = line.decode('utf-8')
+            if line.startswith('data: '):
+                data_str = line[6:]
+                if data_str.strip() == '[DONE]':
+                    break
+                try:
+                    chunk = json.loads(data_str)
+                    delta = chunk.get('choices', [{}])[0].get('delta', {})
+                    content = delta.get('content', '')
+                    if content:
+                        full_content += content
+                        yield content, None
+                except json.JSONDecodeError:
+                    continue
+        # Clean markdown
+        full_content = full_content.replace('```json', '').replace('```', '').strip()
+        yield json.loads(full_content), None
+    except json.JSONDecodeError as e:
+        yield None, f'JSON parse: {str(e)[:100]}'
+    except Exception as e:
+        yield None, f'Call failed: {str(e)[:100]}'
+
 def call_llm(messages, api_base, api_key, model):
     try:
         import requests
@@ -277,6 +378,24 @@ def call_llm(messages, api_base, api_key, model):
         return None, f'JSON解析失败: {str(e)[:100]}'
     except Exception as e:
         return None, f'调用失败: {str(e)[:100]}'
+
+def _legacy_effect_to_structured(effect_str):
+    '''Convert legacy "审美+1 执行-2" to structured [{"attr":..., "delta":..., "text":...}].'''
+    SHORT_FULL = {
+        '审美': '审美判断力', '执行': '执行能力', '商业': '商业思维',
+        '表达': '表达能力', '创意': '创意深度', '作品': '作品集厚度'
+    }
+    result = []
+    parts = effect_str.strip().split()
+    for part in parts:
+        for short, full in SHORT_FULL.items():
+            if part.startswith(short):
+                try:
+                    delta = int(part[len(short):])
+                    result.append({'attr': full, 'delta': delta, 'text': part})
+                except (ValueError, IndexError):
+                    pass
+    return result
 
 # ============================================================
 # Fallback choice generators
@@ -974,6 +1093,151 @@ NPC_ACTIVE_EVENTS = {
     ],
 }
 
+# ============================================================
+# I5: Specialization System — 专精方向
+# ============================================================
+SPECIALIZATIONS = {
+    'brand':        {'id': 'brand',  'name': '品牌设计', 'icon': '🏷', 'desc': '企业VI、包装、品牌全案', 'bonus_attr': '商业思维', 'bonus_amount': 2},
+    'ui_ux':        {'id': 'ui_ux',  'name': 'UI/UX 设计', 'icon': '📱', 'desc': '界面设计、交互逻辑、产品体验', 'bonus_attr': '执行能力', 'bonus_amount': 2},
+    'illustration': {'id': 'illustration', 'name': '商业插画', 'icon': '🖌', 'desc': '商业插画、角色设计、视觉表达', 'bonus_attr': '创意深度', 'bonus_amount': 2},
+    'motion':       {'id': 'motion', 'name': '动态设计', 'icon': '🎬', 'desc': '动画短片、动态品牌、视效制作', 'bonus_attr': '审美判断力', 'bonus_amount': 2},
+    'print':        {'id': 'print',  'name': '印刷与物料', 'icon': '📄', 'desc': '书籍装帧、印刷工艺、空间导视', 'bonus_attr': '作品集厚度', 'bonus_amount': 2},
+}
+
+SPEC_PROJECTS = {
+    'brand':        ['品牌VI升级', '包装设计', '品牌战略手册', '联名产品设计'],
+    'ui_ux':        ['APP界面改版', '官网重构', '后台管理系统', '小程序设计'],
+    'illustration': ['商业插画系列', '角色IP设计', '社媒视觉营销', '绘本创作'],
+    'motion':       ['品牌宣传片', '产品动效演示', '社交媒体短视频', '开场动画'],
+    'print':        ['年度画册', '空间导视系统', '书籍装帧', '展览物料'],
+}
+
+# ============================================================
+# I6: Design Trends System — 设计趋势迭代
+# ============================================================
+DESIGN_TRENDS = [
+    {'name': '极简主义回潮', 'era': '白空间、无衬线、留白至上', 'boost_attr': '审美判断力', 'penalty_attr': '创意深度'},
+    {'name': '赛博朋克浪潮', 'era': '霓虹色调、故障艺术、暗黑未来感', 'boost_attr': '创意深度', 'penalty_attr': '商业思维'},
+    {'name': '新中式美学',   'era': '国潮复兴、水墨元素、东方哲学', 'boost_attr': '表达能力', 'penalty_attr': '执行能力'},
+    {'name': '复古未来主义', 'era': '80年代像素风、合成器波、怀旧再造', 'boost_attr': '审美判断力', 'penalty_attr': '作品集厚度'},
+    {'name': '有机自然设计', 'era': '自然形态、可持续材料、流动线条', 'boost_attr': '创意深度', 'penalty_attr': '商业思维'},
+]
+TREND_CYCLE_TURNS = 48  # ~12 months per trend cycle
+_current_trend_index = {}  # {session_id: index}
+
+def get_current_trend(state, seed_override=None):
+    '''Get current design trend. Changes every 48 turns.'''
+    idx = (state.get('turn_count', 0) // TREND_CYCLE_TURNS) % len(DESIGN_TRENDS)
+    return DESIGN_TRENDS[idx]
+
+def apply_trend_to_economy(state, base_amount):
+    '''Adjust project budget based on trend alignment.'''
+    trend = get_current_trend(state)
+    attrs = state.get('attributes', {})
+    boost_val = attrs.get(trend['boost_attr'], 5)
+    penalty_val = attrs.get(trend['penalty_attr'], 5)
+
+    # If boosting attribute is high, reward goes up; if penalty attribute is low, reward goes down
+    modifier = 1.0
+    if boost_val >= 7:
+        modifier += 0.1
+    if boost_val >= 12:
+        modifier += 0.1
+    if penalty_val <= 4:
+        modifier -= 0.15
+    if penalty_val <= 2:
+        modifier -= 0.1
+
+    return max(5000, int(base_amount * modifier)), modifier, trend
+
+# ============================================================
+# I7: Ending System — 结局检测
+# ============================================================
+ENDING_TYPES = [
+    {'id': 'peak',       'name': '巅峰设计师', 'icon': '🌟', 'type': 'he'},
+    {'id': 'career_switch', 'name': '华丽转身', 'icon': '🔄', 'type': 'he'},
+    {'id': 'retirement', 'name': '平稳着陆', 'icon': '🏡', 'type': 'he'},
+    {'id': 'bankruptcy', 'name': '黯然离场', 'icon': '💸', 'type': 'be'},
+]
+
+def check_endings(state):
+    '''Check all ending conditions. Returns ending dict or None.'''
+    turn = state.get('turn_count', 0)
+    attrs = state.get('attributes', {})
+    savings = state.get('savings', 3000)
+    title = state.get('title', {}).get('title', '')
+    log = state.get('story_log', [])
+
+    # Peak ending: any attr >= 18 AND top title
+    if any(v >= 18 for v in attrs.values()) and title in ('独立设计大师', '创意合伙人', '设计总监'):
+        return {'id': 'peak', 'name': '巅峰设计师', 'icon': '🌟', 'type': 'he',
+                'text': '你的名字在行业里已经成为一个标签。从默默无闻到巅峰，这一路每一步都算数。'}
+
+    # Career switch ending: turn > 80, high business + expression
+    if turn > 80 and attrs.get('商业思维', 0) >= 15 and attrs.get('表达能力', 0) >= 15:
+        return {'id': 'career_switch', 'name': '华丽转身', 'icon': '🔄', 'type': 'he',
+                'text': '你发现自己在商业策略上的嗅觉远超设计本身。创立了自己的设计咨询公司，开始以另一种方式推动这个行业。'}
+
+    # Bankruptcy ending
+    if savings < -10000:
+        return {'id': 'bankruptcy', 'name': '黯然离场', 'icon': '💸', 'type': 'be',
+                'text': '财务的窟窿已经大到无法填补。你把最后的设备卖了还债，在出租屋里看着空白的屏幕。'}
+
+    # Retirement ending: 30 turns without 转折点
+    recent = log[-30:] if len(log) >= 30 else log
+    no_turning_point = all(e.get('event_tag') != '转折点' for e in recent[-20:]) if len(recent) >= 20 else False
+    if turn > 50 and no_turning_point and attrs.get('作品集厚度', 0) >= 8:
+        return {'id': 'retirement', 'name': '平稳着陆', 'icon': '🏡', 'type': 'he',
+                'text': '你没有成为传奇，但你在行业中找到了自己的位置。稳定的客户、不错的收入、有意义的作品——这或许就是最好的结局。'}
+
+    return None
+
+# ============================================================
+# I8: Industry News System — 行业动态
+# ============================================================
+_industry_news_cache = {}  # {seed: [(date, news_text)]}
+
+INDUSTRY_NEWS_PROMPT = '''你是设计行业观察媒体。请根据当前游戏状态生成 2-3 条行业新闻（每条 ≤40 字）。
+格式：纯JSON数组，每项{ "text": "新闻内容" }。
+新闻应覆盖：行业大事件、设计趋势、竞争对手动态、技术革新、市场变化等。
+只输出JSON数组。'''
+
+def generate_industry_news(state, cfg):
+    '''Generate industry news. Cached per 12-turn cycle keyed by state turn range.'''
+    turn = state.get('turn_count', 0)
+    cycle = turn // 12
+    cache_key = f'{cycle}'
+    if cache_key in _industry_news_cache:
+        return _industry_news_cache[cache_key]
+
+    player = state.get('player', {})
+    npcs = state.get('npcs', [])
+
+    context = f'当前回合：{turn}，玩家：{player.get("name","")}，头衔：{state.get("title",{}).get("title","")}\n'
+    if npcs:
+        context += '活跃NPC：' + ', '.join(f'{n["name"]}({n["role"]})' for n in npcs[:3])
+
+    messages = [
+        {'role': 'system', 'content': INDUSTRY_NEWS_PROMPT},
+        {'role': 'user', 'content': context}
+    ]
+
+    try:
+        result, err = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
+        if err or not isinstance(result, list):
+            return []
+        news = [item for item in result if isinstance(item, dict) and item.get('text')]
+        _industry_news_cache[cache_key] = news
+        return news
+    except:
+        return []
+
+def get_cached_news(state):
+    '''Get pre-generated news for current cycle.'''
+    turn = state.get('turn_count', 0)
+    cycle = turn // 12
+    return _industry_news_cache.get(f'{cycle}', [])
+
 def generate_npc_event(state):
     '''Generate a random NPC active event every 3-4 turns. Returns event dict or None.'''
     turn = state.get('turn_count', 0)
@@ -1052,13 +1316,13 @@ def run_attribute_checks(state, current_narrative, story_log):
 # I3: Traits System — 基因式Traits
 # ============================================================
 ORIGIN_TRAITS = {
-    '应届生':   {'name': '学院派',   'desc': '理论基础扎实，对新风格吸收快', 'attr_bonus': lambda attrs: {'创意深度': 1} if attrs.get('创意深度', 5) > 5 else {}},
-    '乙方执行': {'name': '执行力基因', 'desc': '长期乙方训练出的高效执行习惯', 'effect_mod': lambda e: e + 1 if '执行' in e else e},
-    '甲方品牌': {'name': '商业嗅觉',   'desc': '从品牌方视角理解设计的商业价值', 'savings_mod': 0.15},
-    '媒体编辑': {'name': '信息敏感',   'desc': '对行业动态和人脉变化更敏锐', 'event_bonus': True},
-    '自由职业': {'name': '独狼基因',   'desc': '靠自己成长，快但不稳定', 'stamina_penalty': 3},
-    '印刷厂':   {'name': '工艺基因',   'desc': '对材料和落地有直觉理解', 'attr_bonus': lambda attrs: {'作品集厚度': 1}},
-    '自定义':   {'name': '无标签',     'desc': '你的道路由自己定义', 'attr_bonus': lambda attrs: {}},
+    '应届生':   {'name': '学院派底子',   'desc': '理论扎实，对新风格吸收快。培训学习效果+20%', 'train_boost': 1.2, 'init_attr': {'创意深度': 2}},
+    '乙方执行': {'name': '执行力基因',   'desc': '高强度执行训练出的习惯。所有行动精力消耗-2，但创意空间受限', 'stamina_discount': 2, 'init_attr': {'执行能力': 2, '创意深度': -1}},
+    '甲方品牌': {'name': '商业嗅觉',     'desc': '从品牌方视角理解设计价值。薪资谈判+25%，但设计自由受限', 'salary_mod': 0.25, 'init_attr': {'商业思维': 2, '审美判断力': -1}},
+    '媒体编辑': {'name': '信息敏感',     'desc': '对行业动态敏锐，NPC活动触发概率翻倍。手上功夫需磨练', 'npc_event_boost': True, 'init_attr': {'表达能力': 3, '执行能力': -2}},
+    '自由职业': {'name': '独狼基因',     'desc': '靠自己成长，无固定薪资和办公开销。精力消耗更大', 'no_salary': True, 'expense_discount': 0.4, 'stamina_penalty': 3},
+    '印刷厂':   {'name': '工艺基因',     'desc': '对材料和落地有直觉。作品集积累速度+50%，但商业思维需要补课', 'portfolio_boost': 1.5, 'init_attr': {'作品集厚度': 2, '商业思维': -1}},
+    '自定义':   {'name': '无标签',       'desc': '你的道路由自己定义，不设任何框架', 'init_attr': {}},
 }
 
 def calculate_title(attrs):
@@ -1239,9 +1503,25 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
 # ============================================================
 # API Routes
 # ============================================================
+MOBILE_UA_KEYWORDS = [
+    'Android', 'iPhone', 'iPad', 'iPod', 'webOS', 'BlackBerry', 'Windows Phone',
+    'Mobile', 'mobile', 'Mobi', 'Opera Mini', 'IEMobile', 'Symbian',
+]
+
+def is_mobile_device():
+    ua = request.headers.get('User-Agent', '')
+    return any(kw in ua for kw in MOBILE_UA_KEYWORDS)
+
 @app.route('/')
 def index():
-    return send_from_directory('static', 'index.html')
+    view = request.args.get('view', '')
+    if view == 'desktop':
+        return send_from_directory('static', 'desktop.html')
+    if view == 'mobile':
+        return send_from_directory('static', 'mobile.html')
+    if is_mobile_device():
+        return send_from_directory('static', 'mobile.html')
+    return send_from_directory('static', 'desktop.html')
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def api_config():
@@ -1359,6 +1639,15 @@ def api_new_game():
     # I3: Assign trait based on origin
     trait = ORIGIN_TRAITS.get(origin_key, ORIGIN_TRAITS['自定义'])
     state['trait'] = {'name': trait['name'], 'desc': trait['desc']}
+    # I5: Set specialization if provided
+    spec_id = data.get('specialization', '')
+    if spec_id in SPECIALIZATIONS:
+        spec = SPECIALIZATIONS[spec_id]
+        state['specialization'] = spec
+        # Apply specialization bonus
+        bonus_attr = spec['bonus_attr']
+        state['attributes'][bonus_attr] = min(ATTR_CAP, state['attributes'].get(bonus_attr, 5) + spec['bonus_amount'])
+        state['attribute_xp'][bonus_attr] = level_to_xp_target(state['attributes'][bonus_attr])
     # S1: Initialize first milestone
     state['milestone'] = None
 
@@ -1392,7 +1681,8 @@ def api_new_game():
     state['milestone'] = generate_milestone(state)
     new_ach, unlocked = check_achievements(state)
     state['unlocked_achievements'] = list(unlocked)
-    save_state(state)
+    with get_player_lock():
+        save_state(state)
     return jsonify({
         'ok': True,
         'state': state,
@@ -1414,8 +1704,10 @@ def api_action():
     action_text = data.get('action', '')
 
     # Apply the chosen effect BEFORE calling LLM
-    # Reset NPC interaction tracking for new turn
-    state['_npc_interacted'] = {}
+    # Reset NPC interaction tracking for new turn (memory, not persisted)
+    get_npc_interactions().clear()
+    # Collect NPC events from last turn for LLM context
+    npc_context = flush_npc_event_log()
     chosen_effect = ''
     if choice_id and not action_text:
         last_entry = state['story_log'][-1] if state['story_log'] else None
@@ -1437,10 +1729,26 @@ def api_action():
                  '自由职业' if '自由' in state.get('player', {}).get('origin', '') else \
                  '印刷厂' if '印刷' in state.get('player', {}).get('origin', '') else '自定义'
     trait_def = ORIGIN_TRAITS.get(origin_key, ORIGIN_TRAITS['自定义'])
-    # Trait stamina penalty for freelancer
+
+    # Apply origin trait mechanics
+    # Stamina penalty (freelancer)
     if trait_def.get('stamina_penalty'):
-        state['stamina'] = max(0, state['stamina'] - trait_def.get('stamina_penalty', 0))
+        state['stamina'] = max(0, state.get('stamina', 80) - trait_def.get('stamina_penalty', 0))
+    # Stamina discount (乙方执行)
+    if trait_def.get('stamina_discount'):
+        state['stamina'] = min(100, state.get('stamina', 80) + trait_def['stamina_discount'])
+
     applied_effects = apply_effect_xp(state, chosen_effect)
+
+    # Apply train boost from trait
+    if trait_def.get('train_boost') and applied_effects:
+        boost = trait_def['train_boost']
+        xp = state.get('attribute_xp', {})
+        for attr in applied_effects:
+            bonus = int(50 * (boost - 1.0))  # 20% boost = 10 extra XP per +1
+            if bonus > 0:
+                xp[attr] = xp.get(attr, 0) + bonus
+        state['attribute_xp'] = xp
 
     # F-EXTRA: Forced rest when stamina depleted
     is_forced_rest = False
@@ -1453,6 +1761,19 @@ def api_action():
         is_forced_rest = True
 
     messages = build_messages(state, action_text, is_forced_rest, hospital_fee)
+
+    # Inject NPC interaction context from last turn
+    spotlight = tick_npc_spotlight()
+    if npc_context or spotlight:
+        npc_lines = []
+        for n_name, n_act in npc_context:
+            npc_lines.append(f'  · 本回合和{n_name}互动：{n_act}')
+        if spotlight:
+            npc_lines.append(f'  · 以下人物最近与你接触过，可能在生活中自然出现：')
+            for s_name, s_turns in spotlight:
+                npc_lines.append(f'    - {s_name}（已接触，剩余活跃{s_turns}回合）')
+        if npc_lines:
+            messages.append({'role': 'user', 'content': '[系统提示] 请在叙事中自然地融入以下信息。如果有机会，让最近接触过的人物在场景中自然地出现，不需要强行插入：\n' + '\n'.join(npc_lines)})
 
     # Run attribute checks and inject results
     last_narrative = state['story_log'][-1].get('narrative', '') if state['story_log'] else ''
@@ -1523,8 +1844,18 @@ def api_action():
 
     # I1: NPC active event
     npc_event = generate_npc_event(state)
+    # I7: Endings check
+    ending = check_endings(state)
+    # I8: Generate industry news (every 12 turns)
+    generate_industry_news(state, cfg)
+    # I6: Design trend
+    trend = get_current_trend(state)
 
-    save_state(state)
+    lock = get_player_lock()
+    with lock:
+        state['_trend'] = trend
+        state['_industry_news'] = get_cached_news(state)
+        save_state(state)
     # S2: Get stamina status for response
     stamina_status, status_debuff = get_stamina_status(state['stamina'])
 
@@ -1554,12 +1885,18 @@ def api_action():
         'stamina_status': stamina_status,
         'status_debuff': status_debuff,
         'trait': state.get('trait'),
-        'turn': turn
+        'turn': turn,
+        'ending': ending,
+        'trend': trend,
+        'industry_news': get_cached_news(state),
     })
 
 @app.route('/api/state', methods=['GET'])
 def api_state():
     state = load_state()
+    if state:
+        state['trend'] = state.get('_trend')
+        state['industry_news'] = state.get('_industry_news', [])
     return jsonify({'state': state})
 
 @app.route('/api/achievements', methods=['GET'])
@@ -1593,7 +1930,9 @@ def api_import():
     state = data['state']
     if not isinstance(state, dict):
         return jsonify({'error': '存档格式错误'}), 400
-    save_state(state)
+    lock = get_player_lock()
+    with lock:
+        save_state(state)
     return jsonify({'ok': True, 'state': state})
 
 @app.route('/api/reset', methods=['POST'])
@@ -1655,8 +1994,8 @@ def api_npc_interact():
     if not npc:
         return jsonify({'error': 'NPC 不存在'}), 404
 
-    # One interaction per NPC per turn
-    interacted = state.get('_npc_interacted', {})
+    # One interaction per NPC per turn (memory, not persisted)
+    interacted = get_npc_interactions()
     if interacted.get(npc_id):
         return jsonify({'error': f'本回合已经和{npc["name"]}互动过了'}), 400
 
@@ -1696,11 +2035,13 @@ def api_npc_interact():
             npc['relation'] = rel
             break
 
-    # Mark interaction
+    # Mark interaction and record for next turn's LLM context
     interacted[npc_id] = True
-    state['_npc_interacted'] = interacted
+    push_npc_event(npc['name'], action['text'])
 
-    save_state(state)
+    lock = get_player_lock()
+    with lock:
+        save_state(state)
     return jsonify({
         'ok': True,
         'npc_name': npc['name'],
@@ -1744,12 +2085,24 @@ def api_project():
     if not proj:
         # Auto-generate a project if none exists
         import random as _random
+        spec = state.get('specialization', {})
+        spec_id = spec.get('id', '')
+        spec_types = SPEC_PROJECTS.get(spec_id, ['品牌VI升级', '产品发布会设计', '年度画册'])
+        generic_types = ['品牌VI升级', '产品发布会设计', '年度画册', '空间导视系统', 'APP界面改版', '包装设计'] if not spec_id else ['产品发布会设计', '年度画册']
+        import random as _random
         clients = ['森屿集团', '云帆科技', '墨白文化', '青禾品牌', '知味餐饮', '星辰互娱']
-        types = ['品牌VI升级', '产品发布会设计', '年度画册', '空间导视系统', 'APP界面改版', '包装设计']
+        # 60% chance to get a specialization project
+        proj_types = [_random.choice(spec_types)] if _random.random() < 0.6 else generic_types
+        types = proj_types
+        base_budget = _random.choice([5000, 8000, 12000, 15000, 20000])
+        adjusted_budget, trend_mod, trend = apply_trend_to_economy(state, base_budget)
         proj = {
             'name': f'{_random.choice(clients)}-{_random.choice(types)}',
             'client': _random.choice(clients),
-            'budget': _random.choice([5000, 8000, 12000, 15000, 20000]),
+            'budget': adjusted_budget,
+            'base_budget': base_budget,
+            'trend_mod': round(trend_mod, 2),
+            'trend': trend['name'] if trend else '',
             'deadline_turns': _random.choice([5, 6, 7, 8]),
             'quality': max(10, state.get('attributes', {}).get('审美判断力', 5) * 10),
             'client_satisfaction': max(10, state.get('attributes', {}).get('表达能力', 5) * 10),
@@ -1757,7 +2110,9 @@ def api_project():
             'start_turn': state.get('turn_count', 0)
         }
         state['current_project'] = proj
-        save_state(state)
+        lock = get_player_lock()
+        with lock:
+            save_state(state)
     # Auto-progress project quality based on attributes
     attrs = state.get('attributes', {})
     proj['quality'] = min(100, proj.get('quality', 0) + attrs.get('审美判断力', 5) - 3)
@@ -1771,6 +2126,13 @@ def api_project():
 # ============================================================
 # Portfolio Generator — LLM生成作品集条目
 # ============================================================
+@app.route('/api/industry_news', methods=['GET'])
+def api_industry_news():
+    state = load_state()
+    if not state:
+        return jsonify({'news': []})
+    return jsonify({'news': get_cached_news(state)})
+
 @app.route('/api/portfolio/generate', methods=['POST'])
 def api_portfolio_generate():
     state = load_state()
@@ -1854,16 +2216,17 @@ def api_active_action():
     # Apply deterministic effects (these are the "skeleton", LLM narrates the "flesh")
     result_msg = ''
     action_context = ''
-    if action_key == 'train' and action_attr:
+    if action_key in ('train', 'train_intensive'):
+        if not action_attr:
+            attrs = state.get('attributes', {})
+            non_portfolio = {k: v for k, v in attrs.items() if k != '作品集厚度'}
+            action_attr = min(non_portfolio, key=non_portfolio.get) if non_portfolio else '审美判断力'
         if action_attr in state.get('attributes', {}):
-            state['attributes'][action_attr] = min(ATTR_CAP, state['attributes'][action_attr] + 1)
-            action_context = f'主动行动：报班学习{action_attr}，属性提升+1。'
-            result_msg = f'{action_attr} +1'
-    elif action_key == 'train_intensive' and action_attr:
-        if action_attr in state.get('attributes', {}):
-            state['attributes'][action_attr] = min(ATTR_CAP, state['attributes'][action_attr] + 2)
-            action_context = f'主动行动：参加封闭集训，高强度学习{action_attr}，属性提升+2，但极度消耗精力和金钱。'
-            result_msg = f'{action_attr} +2'
+            boost = 1 if action_key == 'train' else 2
+            state['attributes'][action_attr] = min(ATTR_CAP, state['attributes'][action_attr] + boost)
+            verb = '报班学习' if action_key == 'train' else '参加封闭集训，高强度学习'
+            action_context = f'主动行动：{verb}{action_attr}，属性提升+{boost}。'
+            result_msg = f'{action_attr} +{boost}'
     elif action_key == 'rest_short':
         state['stamina'] = min(100, state.get('stamina', 80) + 15)
         action_context = f'主动行动：周末休整，精力恢复+15。这个月节奏比较舒缓。'
@@ -1935,9 +2298,11 @@ def api_active_action():
     state['_prev_stamina'] = state['stamina']
     milestone_done, milestone_reward = check_milestone(state)
     npc_event = generate_npc_event(state)
-    stamina_status, _ = get_stamina_status(state['stamina'])
+    stamina_status, status_debuff = get_stamina_status(state['stamina'])
 
-    save_state(state)
+    lock = get_player_lock()
+    with lock:
+        save_state(state)
     return jsonify({
         'ok': True,
         'action': action_key,
@@ -1967,9 +2332,6 @@ def api_active_action():
         'status_debuff': status_debuff,
         'trait': state.get('trait'),
         'turn': turn,
-        # Exclusive to active actions
-        'stamina_restored': stamina_restored,
-        'savings_spent': savings_spent
     })
 
 # ============================================================
@@ -2026,7 +2388,9 @@ def api_saves_load():
         return jsonify({'error': f'存档槽位 {slot} 不存在'}), 404
     with open(path, 'r', encoding='utf-8') as f:
         state = json.load(f)
-    save_state(state)
+    lock = get_player_lock()
+    with lock:
+        save_state(state)
     return jsonify({'ok': True, 'state': state})
 
 @app.route('/api/saves/delete', methods=['POST'])
@@ -2038,8 +2402,207 @@ def api_saves_delete():
         os.remove(path)
     return jsonify({'ok': True})
 
+@app.route('/api/action/stream', methods=['POST'])
+def api_action_stream():
+    '''SSE streaming version of api_action.'''
+    from flask import Response, stream_with_context
+    data = request.get_json(silent=True) or {}
+    cfg = load_config()
+    if not cfg.get('api_key'):
+        return jsonify({'error': '请先配置 API Key'}), 400
+
+    def generate():
+        state = load_state()
+        if not state:
+            yield f'data: {json.dumps({"error": "没有存档"})}\n\n'
+            return
+
+        choice_id = data.get('choice_id', '')
+        action_text = data.get('action', '')
+        npc_context = flush_npc_event_log()
+        get_npc_interactions().clear()
+        spotlight = tick_npc_spotlight()
+        chosen_effect = ''
+
+        if choice_id and not action_text:
+            last_entry = state['story_log'][-1] if state['story_log'] else None
+            if last_entry and last_entry.get('choices'):
+                for ch in last_entry['choices']:
+                    if ch['id'] == choice_id:
+                        action_text = ch['text']
+                        chosen_effect = ch.get('effect', '') or ch.get('effects', [])
+                        break
+        if not action_text:
+            action_text = '玩家做出了选择'
+
+        origin_key = '应届生' if '应届' in state.get('player', {}).get('origin', '') else \
+                     '乙方执行' if '乙方' in state.get('player', {}).get('origin', '') else \
+                     '甲方品牌' if '甲方' in state.get('player', {}).get('origin', '') else \
+                     '自由职业' if '自由' in state.get('player', {}).get('origin', '') else \
+                     '印刷厂' if '印刷' in state.get('player', {}).get('origin', '') else '自定义'
+        trait_def = ORIGIN_TRAITS.get(origin_key, ORIGIN_TRAITS['自定义'])
+        if trait_def.get('stamina_penalty'):
+            state['stamina'] = max(0, state.get('stamina', 80) - trait_def.get('stamina_penalty', 0))
+        if trait_def.get('stamina_discount'):
+            state['stamina'] = min(100, state.get('stamina', 80) + trait_def['stamina_discount'])
+
+        apply_effect_xp(state, chosen_effect)
+
+        is_forced_rest = False
+        hospital_fee = 0
+        if state.get('stamina', 80) <= 0:
+            state['stamina'] = min(100, state['stamina'] + 30)
+            hospital_fee = min(state.get('savings', 0), random.randint(1000, 3000))
+            state['savings'] = max(0, state.get('savings', 3000) - hospital_fee)
+            action_text = f'精力耗尽，强制休息，就医花费 {hospital_fee} 元'
+            is_forced_rest = True
+
+        messages = build_messages(state, action_text, is_forced_rest, hospital_fee)
+        if npc_context or spotlight:
+            npc_lines = []
+            for n_name, n_act in npc_context:
+                npc_lines.append(f'  · 本回合和{n_name}互动：{n_act}')
+            if spotlight:
+                npc_lines.append(f'  · 以下人物最近与你接触过，可能在生活中自然出现：')
+                for s_name, s_turns in spotlight:
+                    npc_lines.append(f'    - {s_name}（已接触，剩余活跃{s_turns}回合）')
+            npc_hint = '[系统提示] 请在叙事中自然地融入以下信息。如果有机会，让最近接触过的人物在场景中自然地出现：\n' + '\n'.join(npc_lines)
+            messages.append({'role': 'user', 'content': npc_hint})
+
+        last_narrative = state['story_log'][-1].get('narrative', '') if state['story_log'] else ''
+        check_results = run_attribute_checks(state, last_narrative, state.get('story_log', []))
+        if check_results:
+            check_text = '\n\n[D M 属性检定结果 - 必须融入叙事]\n'
+            for cr in check_results:
+                check_text += f'  {cr["trigger"]}检定: {cr["attr"]}({cr["value"]}) + D10({cr["roll"]}) = {cr["total"]} vs 难度{cr["difficulty"]} → {"✅成功" if cr["success"] else "❌失败"}\n'
+                check_text += f'  叙事方向: {cr["message"]}\n'
+            messages.append({'role': 'user', 'content': check_text})
+
+        # Stream LLM narrative tokens
+        narrative_buffer = ''
+        result = {}
+        for chunk, err in call_llm_stream(messages, cfg['api_base'], cfg['api_key'], cfg['model']):
+            if err:
+                yield f'data: {json.dumps({"error": err})}\n\n'
+                return
+            if isinstance(chunk, str):
+                narrative_buffer += chunk
+                yield f'data: {json.dumps({"token": chunk})}\n\n'
+            else:
+                result = chunk
+
+        if not result:
+            result = validate_and_fix_result({}, state['turn_count'], state['attributes'])
+
+        result = validate_and_fix_result(result, state['turn_count'], state['attributes'])
+        if result.get('npc_updates'):
+            state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
+        if result.get('company_update'):
+            apply_company_update(state, result['company_update'])
+
+        turn = state['turn_count'] + 1
+        apply_trend_to_xp(state, result.get('attr_trend', {}))
+        state['attributes'] = xp_to_attrs(state)
+
+        entry = {
+            'turn': turn,
+            'player_action': action_text,
+            'narrative': result['narrative'],
+            'choices': result['choices'],
+            'atmosphere': result.get('atmosphere', ''),
+            'attr_display': dict(state['attributes']),
+            'event_tag': result.get('event_tag', '日常'),
+        }
+        state['story_log'].append(entry)
+        state['stamina'] = max(0, min(100, state.get('stamina', 80) + result.get('stamina_change', -5)))
+        state['savings'] = max(0, state.get('savings', 3000) + result.get('savings_change', 0))
+        state['turn_count'] = turn
+
+        prev_stamina = state.get('_prev_stamina', state.get('stamina', 80))
+        state['title'] = calculate_title(state['attributes'])
+        new_ach, unlocked = check_achievements(state, prev_stamina)
+        state['unlocked_achievements'] = list(unlocked)
+        state['_prev_stamina'] = state['stamina']
+
+        arc_msg = detect_and_start_arc(state)
+        challenge = check_career_challenge(state)
+        economy_event = process_economy(state)
+        crisis_event = check_savings_crisis(state)
+        project_phase_hint = advance_project_phase(state)
+        milestone_done, milestone_reward = check_milestone(state)
+        if milestone_done:
+            new_ach, unlocked = check_achievements(state, prev_stamina)
+            state['unlocked_achievements'] = list(unlocked)
+        npc_event = generate_npc_event(state)
+        stamina_status, status_debuff = get_stamina_status(state['stamina'])
+        ending = check_endings(state)
+        generate_industry_news(state, cfg)
+        trend = get_current_trend(state)
+
+        lock = get_player_lock()
+        with lock:
+            save_state(state)
+
+        # Build final response
+        new_achievements_list = [a for a in ACHIEVEMENTS if a['id'] in new_ach]
+        full_state = {
+            'ok': True, 'entry': entry, 'attributes': state['attributes'],
+            'stamina': state['stamina'], 'savings': state['savings'],
+            'game_date': get_game_date(state),
+            'player_age': int(state.get('player', {}).get('age', '24') or 24) + state['turn_count'] // 48,
+            'title': state['title'], 'npcs': state['npcs'],
+            'company': state.get('company', {}), 'career_history': state.get('career_history', []),
+            'unlocked_achievements': list(unlocked),
+            'new_achievements': new_achievements_list,
+            'milestone': state.get('milestone'), 'milestone_done': milestone_done,
+            'milestone_reward': milestone_reward, 'economy_event': economy_event,
+            'crisis_event': crisis_event, 'arc_msg': arc_msg,
+            'project_phase_hint': project_phase_hint, 'challenge': challenge,
+            'npc_event': npc_event, 'stamina_status': stamina_status,
+            'status_debuff': status_debuff, 'trait': state.get('trait'), 'turn': turn
+        }
+        yield f'data: {json.dumps({"done": True, "state": full_state}, ensure_ascii=False)}\n\n'
+
+    return Response(
+        stream_with_context(generate()),
+        mimetype='text/event-stream',
+        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'}
+    )
+
+@app.route('/api/ending/resolve', methods=['POST'])
+def api_ending_resolve():
+    state = load_state()
+    if not state:
+        return jsonify({'error': '没有存档'}), 404
+    data = request.get_json(silent=True) or {}
+    ending = check_endings(state)
+    if ending:
+        state['ending_result'] = ending
+        state['phase'] = 'ended'
+        save_state(state)
+        return jsonify({'ok': True, 'ending': ending})
+    return jsonify({'error': '未触发结局'}), 400
+
+FEEDBACK_FILE = os.path.join(BASE_DIR, 'player_feedback.jsonl')
+
+@app.route('/api/feedback', methods=['POST'])
+def api_feedback():
+    data = request.get_json(silent=True) or {}
+    text = (data.get('text') or '').strip()
+    if not text:
+        return jsonify({'error': '反馈内容不能为空'}), 400
+    entry = {
+        'time': datetime.now().isoformat(),
+        'turn': data.get('turn', 0),
+        'player': data.get('player', ''),
+        'text': text,
+    }
+    with open(FEEDBACK_FILE, 'a', encoding='utf-8') as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+    return jsonify({'ok': True})
+
 if __name__ == '__main__':
     print('=' * 50)
     print('  平面设计师模拟器 - http://localhost:8765')
     print('=' * 50)
-    app.run(host='0.0.0.0', port=8765, debug=False, use_reloader=False)
+    app.run(host='0.0.0.0', port=8765, debug=False, use_reloader=False, threaded=True)

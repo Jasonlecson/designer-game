@@ -1,0 +1,972 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>平面设计师模拟器 · 职业生涯版</title>
+<style>
+/* ============================================================
+   DESKTOP DESIGN TOKENS — Editor-Style 3-Column Layout
+   ============================================================ */
+:root {
+  --surface-0: #faf7f2;
+  --surface-1: #f5f1ea;
+  --surface-2: #ede7dd;
+  --surface-3: #e3dbce;
+  --surface-card: #fdfcfa;
+  --surface-sidebar: #2b2722;
+  --text-primary: #2d2a26;
+  --text-secondary: #6b6560;
+  --text-tertiary: #9e9790;
+  --text-sidebar: #c8c3bb;
+  --text-sidebar-dim: #8a847d;
+  --accent: #b8862d;
+  --accent-light: #d4a853;
+  --accent-bg: #fdf5e6;
+  --accent-glow: rgba(184,134,45,0.12);
+  --success: #6b8f71;
+  --success-bg: #edf5ee;
+  --warning: #c4a43e;
+  --warning-bg: #fdf8e8;
+  --danger: #b55b4a;
+  --danger-bg: #fdf0ed;
+  --sidebar-w: 260px;
+  --radius-sm: 4px;
+  --radius: 8px;
+  --radius-lg: 14px;
+  --font-serif: 'Noto Serif SC', 'Source Han Serif SC', 'Songti SC', serif;
+  --font-sans: 'PingFang SC', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+}
+*,*::before,*::after{margin:0;padding:0;box-sizing:border-box}
+html{font-size:15px;-webkit-font-smoothing:antialiased}
+body{
+  font-family:var(--font-sans);
+  background:var(--surface-0);
+  color:var(--text-primary);
+  height:100vh;overflow:hidden;
+}
+::-webkit-scrollbar{width:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--surface-3);border-radius:3px}
+
+/* ============================================================
+   SCREENS
+   ============================================================ */
+.screen{display:none;position:absolute;inset:0}
+.screen.active{display:flex}
+
+/* ============================================================
+   COVER
+   ============================================================ */
+#cover{
+  align-items:center;justify-content:center;flex-direction:column;
+  background:var(--surface-card);
+  overflow:hidden;
+}
+#cover::before{
+  content:'';position:absolute;inset:0;
+  background:
+    radial-gradient(ellipse 80% 60% at 20% 30%, rgba(212,168,83,0.08) 0%, transparent 50%),
+    radial-gradient(ellipse 60% 80% at 80% 60%, rgba(184,134,45,0.06) 0%, transparent 50%);
+}
+.cover-content{position:relative;z-index:1;text-align:center;max-width:520px;padding:40px}
+.cover-tag{display:inline-block;font-size:0.7rem;font-weight:600;letter-spacing:0.12em;color:var(--accent);border:1px solid var(--accent-light);padding:4px 16px;border-radius:20px;margin-bottom:28px}
+.cover-title{font-family:var(--font-serif);font-size:2.8rem;font-weight:700;line-height:1.25;color:var(--text-primary);margin-bottom:12px}
+.cover-sub{font-family:var(--font-serif);font-size:1rem;color:var(--text-secondary);line-height:1.7;margin-bottom:40px}
+.cover-actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap}
+.cover-footer{position:absolute;bottom:24px;z-index:1;font-size:0.7rem;color:var(--text-tertiary);letter-spacing:0.04em}
+
+/* Buttons */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;padding:10px 22px;border:none;border-radius:var(--radius);font-family:var(--font-sans);font-size:0.86rem;font-weight:600;cursor:pointer;transition:all 0.2s var(--ease-out);white-space:nowrap;letter-spacing:0.01em}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#a07428;transform:translateY(-1px)}
+.btn-secondary{background:var(--surface-card);color:var(--text-primary);border:1px solid var(--surface-3)}
+.btn-secondary:hover{border-color:var(--accent-light);background:var(--accent-bg)}
+.btn-ghost{background:transparent;color:var(--text-secondary);padding:6px 14px}
+.btn-ghost:hover{color:var(--text-primary);background:var(--surface-1)}
+.btn:disabled{opacity:0.5;cursor:not-allowed;pointer-events:none}
+
+/* ============================================================
+   CREATE
+   ============================================================ */
+#create{flex-direction:column;align-items:center;justify-content:flex-start;background:var(--surface-card);overflow-y:auto;padding:40px 0}
+.create-container{width:100%;max-width:560px;padding:40px 24px}
+.create-header{text-align:center;margin-bottom:36px}
+.create-header h2{font-family:var(--font-serif);font-size:1.5rem;color:var(--text-primary);margin-bottom:4px}
+.create-header p{font-size:0.8rem;color:var(--text-secondary)}
+.create-progress-bar{display:flex;gap:4px;margin-bottom:36px}
+.create-progress-bar div{flex:1;height:3px;background:var(--surface-2);border-radius:2px;transition:background 0.4s var(--ease-out)}
+.create-progress-bar div.done{background:var(--accent-light)}
+.create-progress-bar div.active{background:var(--accent)}
+.create-step{display:none;animation:fadeSlideIn 0.4s var(--ease-out)}
+.create-step.active{display:block}
+@keyframes fadeSlideIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
+.field{margin-bottom:16px}
+.field label{display:block;font-size:0.76rem;font-weight:600;color:var(--text-secondary);margin-bottom:6px}
+.field input{width:100%;padding:12px 16px;border:1px solid var(--surface-3);border-radius:var(--radius);font-size:0.93rem;background:var(--surface-0);color:var(--text-primary);transition:border-color 0.2s}
+.field input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.select-card{display:flex;align-items:flex-start;gap:14px;padding:15px;border:1px solid var(--surface-3);border-radius:var(--radius);margin-bottom:8px;cursor:pointer;transition:all 0.2s;background:var(--surface-card)}
+.select-card:hover{border-color:var(--accent-light);background:var(--accent-bg)}
+.select-card.selected{border-color:var(--accent);background:var(--accent-bg)}
+.sc-radio{width:20px;height:20px;min-width:20px;border-radius:50%;border:2px solid var(--surface-3);display:flex;align-items:center;justify-content:center;margin-top:2px;transition:all 0.2s}
+.select-card.selected .sc-radio{border-color:var(--accent);background:var(--accent)}
+.select-card.selected .sc-radio::after{content:'';width:6px;height:6px;border-radius:50%;background:#fff}
+.sc-body{flex:1}
+.sc-title{font-weight:600;font-size:0.9rem;color:var(--text-primary)}
+.sc-desc{font-size:0.78rem;color:var(--text-secondary);margin-top:3px}
+.sc-tags{display:flex;gap:6px;margin-top:8px}
+.sc-tag-good{font-size:0.65rem;padding:2px 10px;border-radius:10px;background:var(--success-bg);color:var(--success)}
+.sc-tag-warn{font-size:0.65rem;padding:2px 10px;border-radius:10px;background:var(--warning-bg);color:var(--warning)}
+.create-nav{display:flex;gap:10px;margin-top:24px}
+.create-nav .btn-back{margin-right:auto}
+
+/* ============================================================
+   GAME SCREEN — 3 Column Layout
+   ============================================================ */
+#game{flex-direction:row;overflow:hidden;background:var(--surface-0)}
+
+/* ---- SIDEBAR ---- */
+#sidebar{
+  width:var(--sidebar-w);min-width:var(--sidebar-w);
+  background:var(--surface-sidebar);display:flex;flex-direction:column;overflow-y:auto;
+  border-right:1px solid rgba(255,255,255,0.04);position:relative;
+}
+#sidebar-resizer{position:absolute;right:0;top:0;bottom:0;width:5px;cursor:col-resize;z-index:10;background:transparent;transition:background 0.15s}
+#sidebar-resizer:hover,#sidebar-resizer.dragging{background:rgba(255,255,255,0.06)}
+.side-section{padding:18px 20px}
+.side-section+.side-section{border-top:1px solid rgba(255,255,255,0.05)}
+.side-label{font-size:0.62rem;font-weight:700;letter-spacing:0.08em;color:var(--text-sidebar-dim);text-transform:uppercase;margin-bottom:10px}
+.player-card{text-align:center;padding:24px 20px}
+.player-avatar{width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent-light));display:inline-flex;align-items:center;justify-content:center;font-family:var(--font-serif);font-size:1.4rem;color:#fff;margin-bottom:10px;box-shadow:0 4px 16px rgba(184,134,45,0.25)}
+.player-name{font-size:1rem;font-weight:700;color:#e8e3da}
+.player-origin{font-size:0.72rem;color:var(--text-sidebar-dim);margin-top:2px}
+.player-meta{display:flex;justify-content:center;gap:14px;margin-top:12px}
+.player-meta-item{text-align:center}
+.player-meta-val{font-size:0.84rem;font-weight:700;color:var(--accent-light)}
+.player-meta-label{font-size:0.62rem;color:var(--text-sidebar-dim)}
+.attr-list{display:flex;flex-direction:column;gap:9px}
+.attr-header{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:5px}
+.attr-name{font-size:0.72rem;color:var(--text-sidebar)}
+.attr-value{font-size:0.82rem;font-weight:700}
+.attr-value.high{color:var(--success)}
+.attr-value.mid{color:var(--accent-light)}
+.attr-value.low{color:#d4846a}
+.attr-bar{height:4px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden}
+.attr-fill{height:100%;border-radius:2px;transition:width 0.6s var(--ease-out)}
+.attr-fill.high{background:var(--success)}
+.attr-fill.mid{background:var(--accent-light)}
+.attr-fill.low{background:#d4846a}
+.npc-item{display:flex;align-items:center;gap:10px;padding:6px 0}
+.npc-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:#fff;flex-shrink:0}
+.npc-info{min-width:0}
+.npc-name{font-size:0.76rem;color:var(--text-sidebar);font-weight:500}
+.npc-role{font-size:0.64rem;color:var(--text-sidebar-dim)}
+.side-ms-section{display:none}
+.ms-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:6px}
+.ms-title{font-size:0.7rem;color:var(--text-sidebar)}
+.ms-deadline{font-size:0.6rem;color:var(--accent-light)}
+.ms-progress{height:3px;background:rgba(255,255,255,0.08);border-radius:2px;overflow:hidden}
+.ms-progress-fill{height:100%;background:var(--accent);border-radius:2px;transition:width 0.4s}
+.ms-reward{font-size:0.6rem;color:var(--text-sidebar-dim);margin-top:4px}
+
+/* ---- MAIN CONTENT ---- */
+#main-content{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#main-topbar{
+  flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  padding:12px 20px;background:var(--surface-card);border-bottom:1px solid var(--surface-2);
+}
+#main-topbar-left{display:flex;align-items:center;gap:12px;font-size:0.78rem;color:var(--text-secondary)}
+#main-topbar-left strong{color:var(--text-primary)}
+.topbar-tag{font-size:0.64rem;padding:2px 10px;border-radius:10px;font-weight:600}
+.topbar-actions{display:flex;gap:6px}
+.topbar-btn{
+  font-size:0.72rem;padding:5px 12px;border-radius:var(--radius-sm);
+  border:1px solid var(--surface-3);background:var(--surface-card);cursor:pointer;color:var(--text-secondary);
+}
+.topbar-btn:hover{background:var(--surface-1)}
+
+/* ---- TABS ---- */
+#tab-nav{
+  flex-shrink:0;display:flex;gap:0;
+  background:var(--surface-card);border-bottom:1px solid var(--surface-2);padding:0 20px;
+}
+.tab-link{
+  padding:10px 18px;font-size:0.8rem;font-weight:600;color:var(--text-tertiary);
+  cursor:pointer;border-bottom:2px solid transparent;transition:all 0.2s;
+}
+.tab-link:hover{color:var(--text-secondary)}
+.tab-link.active{color:var(--accent);border-bottom-color:var(--accent)}
+
+/* ---- TAB CONTENT ---- */
+#tab-content{flex:1;overflow:auto}
+
+/* Dashboard layout: narrative-centered */
+.dashboard-content{display:flex;flex-direction:column;height:100%;overflow-y:auto;padding:20px}
+.event-date{font-size:0.8rem;color:var(--text-tertiary);margin-bottom:14px;font-weight:600}
+.narrative-box{font-family:var(--font-serif);font-size:0.95rem;line-height:1.9;color:var(--text-primary);margin-bottom:20px}
+.narrative-box p{margin-bottom:12px}
+.choices-box{display:flex;flex-direction:column;gap:10px}
+.choice-btn{display:flex;flex-direction:column;gap:4px;padding:14px 18px;border:1px solid var(--surface-3);border-radius:var(--radius);background:var(--surface-card);cursor:pointer;text-align:left;transition:all 0.2s}
+.choice-btn:hover{border-color:var(--accent-light);background:var(--accent-bg)}
+.choice-btn:disabled{opacity:0.4;cursor:not-allowed}
+.ch-main{font-weight:600;font-size:0.88rem;color:var(--text-primary)}
+.ch-hint{font-size:0.72rem;color:var(--text-tertiary)}
+.ch-effect{font-size:0.68rem;color:var(--accent);margin-top:2px}
+.ch-effects-preview{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.eff-up{font-size:0.66rem;color:var(--success);font-weight:600;padding:1px 6px;background:var(--success-bg);border-radius:4px}
+.eff-down{font-size:0.66rem;color:var(--danger);font-weight:600;padding:1px 6px;background:var(--danger-bg);border-radius:4px}
+.choice-btn-auto{border-style:dashed}
+.aa-sub{display:none;padding:6px;margin-top:-4px;background:var(--surface-1);border-radius:var(--radius)}
+.aa-item{display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:var(--radius-sm);cursor:pointer;font-size:0.78rem;transition:background 0.15s}
+.aa-item:hover{background:var(--accent-bg)}
+.aa-item:disabled{opacity:0.35;pointer-events:none}
+.aa-desc{font-size:0.66rem;color:var(--text-tertiary)}
+.stamina-warn{background:var(--danger-bg);color:var(--danger);border:1px solid rgba(181,91,74,0.2);border-radius:var(--radius);padding:14px 16px;text-align:center;font-weight:600;font-size:0.82rem}
+
+/* Loading */
+.loading{padding:24px;display:flex;justify-content:center}
+.dots{display:flex;gap:6px}
+.dots span{width:8px;height:8px;border-radius:50%;background:var(--accent);animation:bounce 1.4s infinite ease-in-out both}
+.dots span:nth-child(1){animation-delay:-0.32s}
+.dots span:nth-child(2){animation-delay:-0.16s}
+@keyframes bounce{0%,80%,100%{transform:scale(0)}40%{transform:scale(1)}}
+
+/* ============================================================
+   LOG TAB
+   ============================================================ */
+.log-timeline{padding:20px;max-width:700px}
+.timeline-node{display:flex;gap:16px;margin-bottom:4px}
+.timeline-dot-wrap{padding-top:8px;flex-shrink:0;display:flex;flex-direction:column;align-items:center}
+.timeline-dot{width:12px;height:12px;border-radius:50%;border:2px solid var(--surface-3);background:var(--surface-card)}
+.timeline-node.current .timeline-dot{border-color:var(--accent);background:var(--accent);box-shadow:0 0 8px var(--accent-glow)}
+.timeline-line{width:2px;flex:1;background:var(--surface-2);margin-top:4px}
+.timeline-card{flex:1;padding:14px 18px;background:var(--surface-card);border:1px solid var(--surface-2);border-radius:var(--radius);margin-bottom:20px}
+.timeline-card-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
+.timeline-turn-label{font-size:0.72rem;color:var(--text-tertiary)}
+.timeline-turn-label strong{color:var(--accent);font-size:0.82rem;margin-right:6px}
+.timeline-card-atmo{font-size:0.66rem;color:var(--text-tertiary);font-style:italic}
+.timeline-narrative{font-family:var(--font-serif);font-size:0.86rem;line-height:1.8;color:var(--text-secondary)}
+.empty-log{text-align:center;padding:40px;color:var(--text-tertiary)}
+.empty-log .empty-icon{font-size:2.5rem;display:block;margin-bottom:16px}
+
+/* ============================================================
+   NPC TAB
+   ============================================================ */
+.npc-grid{padding:20px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:12px}
+.npc-card{border:1px solid var(--surface-2);border-radius:var(--radius);padding:16px;background:var(--surface-card);cursor:pointer;transition:all 0.2s}
+.npc-card:hover{border-color:var(--accent-light);background:var(--accent-bg)}
+.npc-card-avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;font-size:0.85rem;color:#fff;margin-bottom:10px}
+.npc-card-name{font-weight:600;font-size:0.85rem;color:var(--text-primary)}
+.npc-card-role{font-size:0.7rem;color:var(--text-tertiary);margin-top:2px}
+.npc-card-rel{font-size:0.66rem;color:var(--accent);margin-top:4px}
+
+/* ============================================================
+   PORTFOLIO TAB
+   ============================================================ */
+.portfolio-content{padding:20px}
+.pt-header{display:flex;gap:16px;align-items:flex-start;padding:20px;background:var(--surface-card);border:1px solid var(--surface-2);border-radius:var(--radius-lg);margin-bottom:16px}
+.pt-icon{width:60px;height:60px;border-radius:var(--radius);background:linear-gradient(135deg,var(--accent-light),var(--accent));display:flex;align-items:center;justify-content:center;font-size:1.4rem;flex-shrink:0}
+.pt-info{min-width:0}
+.pt-name{font-weight:700;font-size:0.95rem;color:var(--text-primary)}
+.pt-meta{font-size:0.72rem;color:var(--text-secondary);margin-top:2px}
+.pt-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:10px;margin-bottom:16px}
+.pt-card{border:1px solid var(--surface-2);border-radius:var(--radius);padding:14px;background:var(--surface-card)}
+.pt-card-visual{height:60px;border-radius:var(--radius-sm);margin-bottom:10px;display:flex;align-items:center;justify-content:center;font-size:1.2rem}
+.pt-card-name{font-weight:600;font-size:0.78rem;color:var(--text-primary)}
+.pt-card-role{font-size:0.64rem;color:var(--accent);margin-top:2px}
+.pt-card-style{font-size:0.63rem;color:var(--text-tertiary)}
+.pt-card-highlight{font-size:0.66rem;color:var(--text-secondary);margin-top:4px;line-height:1.3}
+.ach-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.ach-item{padding:8px 10px;border-radius:var(--radius-sm);font-size:0.7rem}
+.ach-item.unlocked{background:var(--accent-bg);border:1px solid var(--accent-light)}
+.ach-item.locked{background:var(--surface-1);border:1px solid var(--surface-2);opacity:0.45}
+.section-title{font-size:0.8rem;font-weight:600;color:var(--text-secondary);margin-bottom:12px}
+
+/* Ending overlay */
+.ending-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,0.6);display:none;align-items:center;justify-content:center}
+.ending-overlay.active{display:flex}
+.ending-card{background:var(--surface-card);border-radius:var(--radius-lg);padding:40px 32px;max-width:440px;width:92%;text-align:center;box-shadow:0 8px 48px rgba(0,0,0,0.2)}
+.ending-card.he{border-top:4px solid var(--accent)}
+.ending-card.be{border-top:4px solid var(--danger)}
+.ending-icon{font-size:2.5rem;margin-bottom:16px;display:block}
+.ending-name{font-family:var(--font-serif);font-size:1.3rem;font-weight:700;margin-bottom:12px}
+.ending-text{font-size:0.88rem;color:var(--text-secondary);line-height:1.7;margin-bottom:24px}
+.ending-btn{display:inline-flex;padding:12px 28px;background:var(--accent);color:#fff;border:none;border-radius:var(--radius);font-size:0.88rem;font-weight:600;cursor:pointer}
+.ending-btn:hover{background:#a07428}
+
+/* Industry news */
+.industry-news{margin-top:16px;padding:12px 16px;background:var(--surface-card);border:1px solid var(--surface-2);border-radius:var(--radius);font-size:0.72rem}
+.industry-news-title{font-weight:600;color:var(--accent);margin-bottom:8px;cursor:pointer}
+.industry-news-item{color:var(--text-secondary);padding:3px 0;font-size:0.7rem}
+
+/* ============================================================
+   MODAL
+   ============================================================ */
+.modal-overlay{position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,0.25);display:none;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal-card{background:var(--surface-card);border-radius:var(--radius-lg);padding:24px;max-width:420px;width:92%;max-height:80vh;overflow-y:auto;box-shadow:0 8px 40px rgba(0,0,0,0.12)}
+
+/* ============================================================
+   NOTIFICATIONS
+   ============================================================ */
+.notif{
+  position:fixed;left:16px;right:16px;
+  background:var(--surface-card);border:1px solid var(--surface-2);border-radius:var(--radius);
+  padding:12px 16px;z-index:10000;display:flex;align-items:center;gap:10px;
+  font-size:0.82rem;box-shadow:0 4px 20px rgba(0,0,0,0.1);
+  animation:notifIn 0.3s ease;pointer-events:none;
+}
+@keyframes notifIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+@keyframes notifOut{from{opacity:1;transform:translateY(0)}to{opacity:0;transform:translateY(-10px)}}
+.notif-icon{font-size:1rem}
+.notif-text{font-size:0.78rem;line-height:1.4}
+
+</style>
+</head>
+<body>
+
+<!-- COVER -->
+<div class="screen active" id="cover">
+  <div class="cover-content">
+    <div class="cover-tag">C A R E E R  S I M</div>
+    <h1 class="cover-title">平面设计师<br>模拟器</h1>
+    <p class="cover-sub">在真实的职业生涯中做出选择 —— 每一次决定都在塑造你的未来</p>
+    <div class="cover-actions">
+      <button class="btn btn-primary" onclick="startCreate()">✦ 开始新游戏</button>
+      <button class="btn btn-secondary" onclick="loadGame()">📂 继续游戏</button>
+    </div>
+  </div>
+  <div class="cover-footer">职业生涯版 · v2</div>
+</div>
+
+<!-- CREATE -->
+<div class="screen" id="create"></div>
+
+<!-- GAME -->
+<div class="screen" id="game">
+  <!-- SIDEBAR -->
+  <div id="sidebar">
+    <div id="sidebar-resizer"></div>
+    <div class="player-card">
+      <div class="player-avatar" id="sb-avatar">林</div>
+      <div class="player-name" id="sb-name">—</div>
+      <div class="player-origin" id="sb-origin">—</div>
+      <div class="player-meta">
+        <div class="player-meta-item"><div class="player-meta-val" id="sb-stamina">80</div><div class="player-meta-label">精力</div></div>
+        <div class="player-meta-item"><div class="player-meta-val" id="sb-savings">3k</div><div class="player-meta-label">储蓄</div></div>
+        <div class="player-meta-item"><div class="player-meta-val" id="sb-turn">0</div><div class="player-meta-label">回合</div></div>
+      </div>
+    </div>
+    <div class="side-section">
+      <div class="side-label">属性</div>
+      <div class="attr-list" id="sb-attrs"></div>
+    </div>
+    <div class="side-section side-ms-section" id="sb-ms-section">
+      <div class="side-label">阶段目标</div>
+      <div id="sb-milestone"></div>
+    </div>
+    <div class="side-section">
+      <div class="side-label">人脉</div>
+      <div id="sb-npcs"></div>
+    </div>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main-content">
+    <div id="main-topbar">
+      <div id="main-topbar-left">
+        <span id="tb-location">—</span>
+        <span>·</span>
+        <span id="tb-turn">—</span>
+        <span class="topbar-tag" id="tb-tag">日常</span>
+        <span id="tb-company" style="color:var(--text-tertiary)"></span>
+        <span style="margin-left:auto;font-size:0.68rem;color:var(--accent)" id="tb-trend"></span>
+      </div>
+      <div class="topbar-actions">
+        <button class="topbar-btn" onclick="showFeedback()">💬 反馈</button>
+        <button class="topbar-btn" onclick="showSaves()">💾 存档</button>
+      </div>
+    </div>
+
+    <div id="tab-nav">
+      <div class="tab-link active" data-tab="dashboard" onclick="switchTab('dashboard')">📖 剧情</div>
+      <div class="tab-link" data-tab="log" onclick="switchTab('log')">📜 历程</div>
+      <div class="tab-link" data-tab="network" onclick="switchTab('network')">👥 人脉</div>
+      <div class="tab-link" data-tab="portfolio" onclick="switchTab('portfolio')">🎨 作品集</div>
+    </div>
+
+    <div id="tab-content"></div>
+  </div>
+</div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="if(event.target===this)closeModal()"></div>
+
+<!-- ENDING OVERLAY -->
+<div class="ending-overlay" id="ending-overlay">
+  <div class="ending-card" id="ending-card">
+    <span class="ending-icon" id="ending-icon"></span>
+    <div class="ending-name" id="ending-name"></div>
+    <div class="ending-text" id="ending-text"></div>
+    <button class="ending-btn" onclick="resolveEnding()">接受结局</button>
+    <button class="btn btn-secondary" style="margin-left:8px" onclick="document.getElementById('ending-overlay').classList.remove('active')">继续游戏</button>
+  </div>
+</div>
+
+<script src="/shared.js"></script>
+<script>
+// ============================================================
+// SCREEN MANAGEMENT
+// ============================================================
+let currentScreen = 'cover';
+let currentTab = 'dashboard';
+let selections = {origin:'',resources:'',goal:'',pace:''};
+let createStep = 0;
+let currentPlayer = {name:'林知夏',age:'24',city:'上海',custom_origin:'',specialization:''};
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  currentScreen = id;
+}
+
+// ============================================================
+// CREATE WIZARD
+// ============================================================
+function startCreate() {
+  selections = {origin:'',resources:'',goal:'',pace:''};
+  createStep = 0;
+  currentPlayer = {name:'林知夏',age:'24',city:'上海',custom_origin:''};
+  showScreen('create');
+  renderCreateStep();
+}
+
+function renderCreateStep() {
+  const el = document.getElementById('create');
+  let html = `<div class="create-container">`;
+  html += `<div class="create-header"><h2>创建你的角色</h2><p>${STEP_LABELS[createStep]}</p></div>`;
+  html += `<div class="create-progress-bar">`;
+  for (let i=0;i<6;i++) {
+    let cls='';if(i<createStep)cls='done';if(i===createStep)cls='active';
+    html += `<div class="${cls}"></div>`;
+  }
+  html += `</div>`;
+
+  if (createStep === 0) {
+    html += `<div class="create-step active">
+      <div class="field"><label>名字</label><input id="p-name" value="${esc(currentPlayer.name)}"></div>
+      <div class="field"><label>年龄</label><input id="p-age" value="${esc(currentPlayer.age)}"></div>
+      <div class="field"><label>城市</label><input id="p-city" value="${esc(currentPlayer.city)}"></div>
+      <div class="create-nav"><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 1) {
+    html += `<div class="create-step active">`;
+    ORIGINS.forEach(o => {
+      html += `<div class="select-card${selections.origin===o.id?' selected':''}" onclick="selectOpt('origin','${o.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${o.id}. ${o.title}</div><div class="sc-desc">${o.desc}</div>
+        <div class="sc-tags">${o.good?`<span class="sc-tag-good">✦ ${o.good}</span>`:''}${o.warn?`<span class="sc-tag-warn">△ ${o.warn}</span>`:''}</div></div></div>`;
+    });
+    html += `<div class="field"><label>自定义（选G需填）</label><input id="custom-origin" value="${esc(currentPlayer.custom_origin||'')}"></div>`;
+    html += `<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=0;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 2) {
+    html += `<div class="create-step active">`;
+    RESOURCES.forEach(r => {
+      html += `<div class="select-card${selections.resources===r.id?' selected':''}" onclick="selectOpt('resources','${r.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${r.id}. ${r.title}</div><div class="sc-desc">${r.desc}</div></div></div>`;
+    });
+    html += `<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=1;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 3) {
+    html += `<div class="create-step active">`;
+    GOALS.forEach(g => {
+      html += `<div class="select-card${selections.goal===g.id?' selected':''}" onclick="selectOpt('goal','${g.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${g.id}. ${g.title}</div><div class="sc-desc">${g.desc}</div></div></div>`;
+    });
+    html += `<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=2;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 4) {
+    html += `<div class="create-step active">`;
+    PACES.forEach(p => {
+      html += `<div class="select-card${selections.pace===p.id?' selected':''}" onclick="selectOpt('pace','${p.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${p.id}. ${p.title}</div><div class="sc-desc">${p.desc}</div></div></div>`;
+    });
+    html += `<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=3;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else {
+    html += `<div class="create-step active">`;
+    SPECIALIZATIONS.forEach(s => {
+      html += `<div class="select-card${selections.specialization===s.id?' selected':''}" onclick="selectOpt('specialization','${s.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${s.icon} ${s.name}</div><div class="sc-desc">${s.desc}  · 专精属性: <b style="color:var(--accent)">${s.attr}+2</b></div></div></div>`;
+    });
+    html += `<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=4;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="startGame()">✦ 开始职业生涯</button></div></div>`;
+  }
+  html += `</div>`;
+  el.innerHTML = html;
+}
+
+function selectOpt(type,id){selections[type]=id;renderCreateStep()}
+
+function nextStep() {
+  if (createStep===0){currentPlayer.name=document.getElementById('p-name')?.value??'林知夏';currentPlayer.age=document.getElementById('p-age')?.value??'24';currentPlayer.city=document.getElementById('p-city')?.value??'上海'}
+  if (createStep===1){const ci=document.getElementById('custom-origin');if(ci)currentPlayer.custom_origin=ci.value}
+  createStep++;renderCreateStep();
+}
+
+// ============================================================
+// GAME START / LOAD / RESET
+// ============================================================
+async function startGame() {
+  if(createStep===1){const ci=document.getElementById('custom-origin');if(ci)currentPlayer.custom_origin=ci.value}
+  showScreen('game');
+  setLoading(true);
+  isProcessing = true;
+  try {
+    const d = await API.newGame({...currentPlayer,...selections});
+    gameState = d.state;
+    _prevTitle = d.state?.title?.title || '';
+    isProcessing = false;
+    renderAll();
+  } catch(e) {
+    setLoading(false, esc(e.message));
+    isProcessing = false;
+  }
+}
+
+async function loadGame() {
+  try{const d=await API.getState();if(!d.state){alert('没有存档');return}gameState=d.state;_prevTitle=d.state?.title?.title||'';showScreen('game');renderAll()}
+  catch(e){alert('连接失败')}
+}
+
+async function resetGame() {
+  if(!confirm('确定结束当前游戏？存档将被删除。'))return;
+  try{await API.reset()}catch(e){}
+  gameState=null;showScreen('cover');
+}
+
+// ============================================================
+// RENDER ALL
+// ============================================================
+function renderAll() {
+  if(!gameState)return;
+  const p = gameState.player||{};
+  const attrs = gameState.attributes||{};
+
+  // Sidebar
+  document.getElementById('sb-avatar').textContent = (p.name||'林')[0];
+  document.getElementById('sb-name').textContent = p.name||'—';
+  document.getElementById('sb-origin').textContent = `${p.origin||'—'} · ${getCurrentAge()}岁`;
+  document.getElementById('sb-stamina').textContent = gameState.stamina??80;
+  const sav = gameState.savings??3000;
+  document.getElementById('sb-savings').textContent = sav>=10000?(sav/10000).toFixed(1)+'w':(sav/1000).toFixed(0)+'k';
+  document.getElementById('sb-turn').textContent = gameState.turn_count||0;
+
+  // Topbar
+  document.getElementById('tb-location').textContent = p.city||'上海';
+  document.getElementById('tb-turn').textContent = formatDate(gameState.turn_count);
+  const c = gameState.company||{};
+  document.getElementById('tb-company').textContent = c.name?`${c.name} · ${c.position||'设计师'}`:'';
+  const last = (gameState.story_log||[]).slice(-1)[0];
+  const tag = last?.event_tag||'日常';
+  const tc = TAG_COLORS[tag]||TAG_COLORS['日常'];
+  const tbTag = document.getElementById('tb-tag');
+  tbTag.textContent = tag;tbTag.style.background=tc.bg;tbTag.style.color=tc.color;
+  // Design trend
+  const trendEl = document.getElementById('tb-trend');
+  if (trendEl && gameState.trend) {
+    trendEl.textContent = `📐 ${gameState.trend.name}`;
+    trendEl.style.display = '';
+  } else if (trendEl) {
+    trendEl.style.display = 'none';
+  }
+  // Endings
+  if (window._pendingEnding) {
+    showEnding(window._pendingEnding);
+    window._pendingEnding = null;
+  }
+  // Industry news
+  renderIndustryNews();
+
+  // Sidebar attrs
+  const al = document.getElementById('sb-attrs');
+  let ah='';
+  for(const[k,v] of Object.entries(attrs)){
+    const cls = attrClass(v);
+    ah+=`<div><div class="attr-header"><span class="attr-name">${ATTR_ICONS[k]||''} ${k}</span><span class="attr-value ${cls}">${v}</span></div><div class="attr-bar"><div class="attr-fill ${cls}" style="width:${(v/20*100).toFixed(1)}%"></div></div></div>`;
+  }
+  al.innerHTML=ah;
+
+  // Sidebar NPCs
+  const npcs = gameState.npcs||[];
+  const sn = document.getElementById('sb-npcs');
+  sn.innerHTML = npcs.slice(0,6).map((n,i)=>`<div class="npc-item"><div class="npc-dot" style="background:${AVATAR_COLORS[i%6]}">${n.name[0]}</div><div class="npc-info"><div class="npc-name">${esc(n.name)}</div><div class="npc-role">${esc(n.role)}</div></div></div>`).join('')||'<span style="color:var(--text-sidebar-dim);font-size:0.68rem">暂无</span>';
+
+  // Milestone
+  const ms = gameState.milestone;
+  const mss = document.getElementById('sb-ms-section');
+  if(ms&&!ms.completed){
+    mss.style.display='block';
+    const turnsLeft = Math.max(0,(ms.deadline_turn||0)-(gameState.turn_count||0));
+    const progress = Math.min(100,Math.max(0,ms.progress||0));
+    document.getElementById('sb-milestone').innerHTML = `
+      <div class="ms-header"><span class="ms-title">${esc(ms.description||'')}</span><span class="ms-deadline">${turnsLeft}回合</span></div>
+      <div class="ms-progress"><div class="ms-progress-fill" style="width:${progress}%"></div></div>
+      ${ms.reward?`<div class="ms-reward">🎁 ${esc(ms.reward)}</div>`:''}`;
+  } else { mss.style.display='none'; }
+
+  // Tab content
+  renderTab(currentTab);
+}
+
+function renderTab(tab) {
+  const tc = document.getElementById('tab-content');
+  if(tab==='dashboard') renderDashboard(tc);
+  else if(tab==='log') renderLog(tc);
+  else if(tab==='network') renderNetwork(tc);
+  else if(tab==='portfolio') renderPortfolio(tc);
+}
+
+function switchTab(tab){
+  currentTab = tab;
+  document.querySelectorAll('.tab-link').forEach(l=>l.classList.toggle('active',l.dataset.tab===tab));
+  renderTab(tab);
+}
+
+// ============================================================
+// DASHBOARD TAB
+// ============================================================
+function renderDashboard(tc) {
+  if(!gameState)return;
+  const log = gameState.story_log||[];
+  const last = log[log.length-1];
+  let html = '<div class="dashboard-content">';
+
+  if(!last){
+    tc.innerHTML = '<div class="loading"><div class="dots"><span></span><span></span><span></span></div></div>';
+    return;
+  }
+
+  html += `<div class="event-date">回合 ${gameState.turn_count} · ${esc(last.atmosphere||'')}</div>`;
+  html += `<div class="narrative-box">${formatNarrative(last.narrative||'')}</div>`;
+
+  const st = gameState.stamina??80;
+  if(st<=0){
+    html += '<div class="stamina-warn">⚡ 精力耗尽 · 即将强制休息并扣除医疗费用</div>';
+  } else if(last.choices&&last.choices.length>0){
+    html += '<div class="choices-box">';
+    last.choices.forEach(ch=>{
+      const effects = ch.effects || (ch.effect ? _parseLegacyEffect(ch.effect) : []);
+      const effectsHtml = effects.length ? `<div class="ch-effects-preview">${effects.map(e=>{
+        const cls = e.delta>0?'eff-up':'eff-down';
+        const icon = e.delta>0?'↑':'↓';
+        return `<span class="${cls}" title="${e.attr||''} ${e.delta>0?'+':''}${e.delta}">${icon} ${e.text||e.attr||''}</span>`;
+      }).join(' ')}</div>` : '';
+      html += `<button class="choice-btn" data-choice="${esc(ch.id)}" ${isProcessing?'disabled':''}>
+        <div class="ch-main">${esc(ch.text)}</div>
+        <div class="ch-hint">${esc(ch.hint||'')}</div>
+        ${effectsHtml}
+      </button>`;
+    });
+    html += `<button class="choice-btn choice-btn-auto" ${isProcessing?'disabled':''} onclick="toggleAA()">
+      <div class="ch-main">⭐ 这个月我想做点别的...</div>
+    </button>
+    <div class="aa-sub" id="aa-sub">${buildAA()}</div></div>`;
+  }
+
+  html += '</div>';
+  tc.innerHTML = html;
+}
+
+function toggleAA(){const s=document.getElementById('aa-sub');if(s)s.style.display=s.style.display==='block'?'none':'block'}
+
+function _parseLegacyEffect(str) {
+  if (!str) return [];
+  const map = {'审美':'审美判断力','执行':'执行能力','商业':'商业思维','表达':'表达能力','创意':'创意深度','作品':'作品集厚度'};
+  const result = [];
+  str.split(' ').forEach(p => {
+    for (const [s,f] of Object.entries(map)) {
+      if (p.startsWith(s)) {
+        const d = parseInt(p.slice(s.length));
+        if (!isNaN(d)) result.push({attr:f, delta:d, text:p});
+      }
+    }
+  });
+  return result;
+}
+
+function buildAA(){
+  let h='<div style="font-size:0.72rem;color:var(--text-tertiary);text-align:center;margin-bottom:6px">自主行动</div>';
+  ACTIVE_ACTIONS_LIST.forEach(a=>{const d=a.disabled(gameState);h+=`<div class="aa-item" data-aa="${a.key}" ${d||isProcessing?'disabled':''}><span>${a.name}</span><span class="aa-desc">${a.desc}</span></div>`});
+  return h;
+}
+
+// ============================================================
+// LOG TAB
+// ============================================================
+function renderLog(tc) {
+  const log = gameState.story_log||[];
+  if(log.length===0){
+    tc.innerHTML='<div class="empty-log"><span class="empty-icon">🎨</span><h3>你的职业生涯即将展开</h3></div>';
+    return;
+  }
+  let html='<div class="log-timeline">';
+  log.forEach((entry,i)=>{
+    const isCurrent=i===log.length-1;
+    html+=`<div class="timeline-node${isCurrent?' current':''}" id="turn-${entry.turn}">
+      <div class="timeline-dot-wrap"><div class="timeline-dot"></div>${i<log.length-1?'<div class="timeline-line"></div>':''}</div>
+      <div class="timeline-card">
+        <div class="timeline-card-header">
+          <div class="timeline-turn-label"><strong>T${entry.turn}</strong> ${esc(entry.player_action||'')}</div>
+          <div class="timeline-card-atmo">${esc(entry.atmosphere||'')}</div>
+        </div>
+        <div class="timeline-narrative">${formatNarrative(entry.narrative||'')}</div>
+      </div></div>`;
+  });
+  html+='</div>';
+  tc.innerHTML=html;
+}
+
+// ============================================================
+// NETWORK TAB
+// ============================================================
+function renderNetwork(tc) {
+  const npcs = gameState.npcs||[];
+  if(npcs.length===0){tc.innerHTML='<div class="empty-log"><span class="empty-icon">👥</span>还没有遇到任何人</div>';return}
+  let html='<div class="npc-grid">';
+  npcs.forEach((n,i)=>{
+    html+=`<div class="npc-card" onclick="showNPCSheet('${n.id}')">
+      <div class="npc-card-avatar" style="background:${AVATAR_COLORS[i%6]}">${n.name[0]}</div>
+      <div class="npc-card-name">${esc(n.name)}</div>
+      <div class="npc-card-role">${esc(n.role)}</div>
+      <div class="npc-card-rel">${esc(n.relation||'待展开')}</div>
+    </div>`;
+  });
+  html+='</div>';
+  tc.innerHTML=html;
+}
+
+async function showNPCSheet(npcId){
+  try{
+    const d=await API.getNPCs(npcId);
+    const npc=d.npc;const opts=d.options;
+    let h=`<h3 style="font-family:var(--font-serif);margin-bottom:14px">与 ${esc(npc.name)} 互动</h3>`;
+    h+=`<div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:14px">${esc(npc.role)} · ${esc(npc.relation||'待展开')}</div>`;
+    h+='<div style="display:flex;flex-direction:column;gap:8px">';
+    opts.forEach(opt=>{
+      const dis=!opt.available;
+      h+=`<button onclick="doNPC('${npcId}','${opt.id}')" style="padding:12px;border:1px solid ${dis?'var(--surface-3)':'var(--accent)'};border-radius:var(--radius);background:${dis?'var(--surface-1)':'var(--accent-bg)'};color:${dis?'var(--text-tertiary)':'var(--accent)'};cursor:${dis?'not-allowed':'pointer'};text-align:left">
+        <div style="font-weight:600;font-size:0.82rem">${esc(opt.text)}</div>
+        <div style="font-size:0.68rem;margin-top:4px;color:var(--text-secondary)">${opt.stamina_cost>0?`精力-${opt.stamina_cost}`:opt.stamina_cost<0?`精力+${Math.abs(opt.stamina_cost)}`:'无消耗'} · ${esc(opt.effect)}</div>
+      </button>`;
+    });
+    h+='</div>';
+    h+=`<button onclick="closeModal()" style="margin-top:12px;padding:10px;border:1px solid var(--surface-3);border-radius:var(--radius);background:var(--surface-card);cursor:pointer;width:100%;font-size:0.82rem">关闭</button>`;
+    openModal(h);
+  }catch(e){alert('加载失败')}
+}
+
+async function doNPC(npcId,actionId){
+  try{const d=await API.doNPC(npcId,actionId);updateGameState(d);showNotification('npc',`💬 ${d.npc_name}：${d.effect}`);renderAll();closeModal()}
+  catch(e){showNotification('expense','互动失败')}
+}
+
+// ============================================================
+// PORTFOLIO TAB
+// ============================================================
+function renderPortfolio(tc) {
+  const attrs = gameState.attributes || {};
+  const p = gameState.player || {};
+  const c = gameState.company || {};
+  let html = '<div class="portfolio-content">';
+
+  html += `<div class="pt-header">
+    <div class="pt-icon">📁</div>
+    <div class="pt-info">
+      <div class="pt-name">${esc(p.name||'你')} 的作品集</div>
+      <div class="pt-meta">${c.name?esc(c.name)+' · '+esc(c.position||'设计师'):'独立设计师'}</div>
+    </div>
+  </div>`;
+
+  html += '<div id="pt-grid" class="pt-grid"><div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-tertiary);font-size:0.75rem">正在加载...</div></div>';
+
+  const unlocked = gameState.unlocked_achievements || [];
+  html += '<div class="section-title">🏅 成就</div>';
+  html += '<div class="ach-grid" id="ach-grid"><div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-tertiary);font-size:0.75rem">加载中...</div></div>';
+
+  tc.innerHTML = html;
+  loadPortfolio();
+  loadAchievements();
+}
+
+async function loadPortfolio(){
+  try{const d=await API.genPortfolio();const entries=d.entries||[];const grid=document.getElementById('pt-grid');
+    if(!grid)return;
+    const colors=['var(--accent)','var(--success)','#7b8fa1','#c4a43e','#8e6b9e','#c4755e'];
+    grid.innerHTML = entries.length===0
+      ?'<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-tertiary);font-size:0.75rem">还没有完成的作品</div>'
+      :entries.map((e,i)=>`<div class="pt-card"><div class="pt-card-visual" style="background:linear-gradient(135deg,${colors[i%6]}22,${colors[(i+1)%6]}11)">🖼️</div><div class="pt-card-name">${esc(e.name||'')}</div><div class="pt-card-role">${esc(e.role||'')}</div><div class="pt-card-style">${esc(e.style||'')}</div><div class="pt-card-highlight">${esc(e.highlight||'')}</div></div>`).join('');
+  }catch(e){}
+}
+
+async function loadAchievements(){
+  try{const all=await fetchAchievements();const grid=document.getElementById('ach-grid');if(!grid)return;
+    const unlocked=new Set(gameState.unlocked_achievements||[]);
+    grid.innerHTML=all.map(a=>`<div class="ach-item ${unlocked.has(a.id)?'unlocked':'locked'}"><span>${a.icon}</span> <b>${a.name}</b><div style="font-size:0.62rem;color:var(--text-secondary)">${unlocked.has(a.id)?'已解锁':'未解锁'} · ${a.desc}</div></div>`).join('');
+  }catch(e){}
+}
+
+// ============================================================
+// ACTIONS
+// ============================================================
+async function makeChoice(choiceId){
+  if(isProcessing)return;
+  if(gameState&&gameState.stamina<=0)return;
+  isProcessing=true;
+  const tc=document.getElementById('tab-content');
+  tc.innerHTML='<div class="dashboard-content"><div class="narrative-box" id="narrative-stream"><div class="loading"><div class="dots"><span></span><span></span><span></span></div></div></div></div>';
+  const nel=document.getElementById('narrative-stream');
+  let buf='';
+  await API.streamAction(choiceId,
+    token=>{buf+=token;if(nel)nel.innerHTML=formatNarrative(buf)},
+    state=>{processActionResponse(state);isProcessing=false;renderAll()},
+    err=>{if(nel)nel.innerHTML=`<div style="color:var(--danger);text-align:center;padding:20px">${esc(err)}</div>`;isProcessing=false}
+  );
+}
+
+async function doActiveAction(actionKey){
+  if(isProcessing)return;
+  isProcessing=true;setLoading(true);
+  try{const d=await API.activeAction(actionKey);processActionResponse(d);isProcessing=false;renderAll()}
+  catch(e){setLoading(false,esc(e.message));isProcessing=false}
+}
+
+function setLoading(on,msg){
+  const tc=document.getElementById('tab-content');
+  if(!tc)return;
+  if(on)tc.innerHTML='<div class="loading"><div class="dots"><span></span><span></span><span></span></div></div>';
+  else if(msg)tc.innerHTML=`<div style="color:var(--danger);text-align:center;padding:20px">${msg}</div>`;
+}
+
+// ============================================================
+// FEEDBACK
+// ============================================================
+async function showFeedback() {
+  let html = '<h3 style="font-family:var(--font-serif);margin-bottom:12px">💬 反馈</h3>';
+  html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:12px">有什么想法、建议或 bug？告诉我们</div>';
+  html += '<textarea id="fb-text" style="width:100%;height:80px;padding:10px;border:1px solid var(--surface-3);border-radius:var(--radius);font-size:0.82rem;font-family:var(--font-sans);resize:vertical" placeholder="请输入反馈..."></textarea>';
+  html += '<button class="btn btn-primary" style="margin-top:10px;width:100%" onclick="submitFeedback()">发送反馈</button>';
+  html += '<button class="btn btn-secondary" style="margin-top:6px;width:100%" onclick="closeModal()">取消</button>';
+  openModal(html);
+}
+
+async function submitFeedback() {
+  const text = document.getElementById('fb-text')?.value?.trim();
+  if (!text) { alert('请输入反馈内容'); return; }
+  try {
+    await API.sendFeedback(text, gameState?.turn_count || 0, gameState?.player?.name || '');
+    closeModal();
+    showNotification('milestone', '反馈已提交，感谢！');
+  } catch(e) { alert('提交失败'); }
+}
+
+// ============================================================
+// ENDING & INDUSTRY NEWS
+// ============================================================
+function showEnding(ending) {
+  const overlay = document.getElementById('ending-overlay');
+  const card = document.getElementById('ending-card');
+  card.className = 'ending-card ' + ending.type;
+  document.getElementById('ending-icon').textContent = ending.icon;
+  document.getElementById('ending-name').textContent = ending.name;
+  document.getElementById('ending-text').textContent = ending.text;
+  overlay.classList.add('active');
+}
+
+async function resolveEnding() {
+  if (!window._pendingEnding) return;
+  try {
+    await API.resolveEnding(window._pendingEnding.id);
+    document.getElementById('ending-overlay').classList.remove('active');
+    gameState.phase = 'ended';
+    showNotification('achievement', `结局达成：${window._pendingEnding.name}`);
+  } catch(e) {}
+}
+
+async function renderIndustryNews() {
+  if (!gameState) return;
+  const news = gameState.industry_news || [];
+  if (news.length === 0) return;
+  const tc = document.getElementById('tab-content');
+  if (!tc) return;
+  // Append to dashboard if available, or skip
+  let newsHtml = '<div class="industry-news"><div class="industry-news-title">📰 行业动态</div>';
+  news.forEach(n => { newsHtml += `<div class="industry-news-item">${esc(n.text)}</div>`; });
+  newsHtml += '</div>';
+  const dash = tc.querySelector('.dashboard-content');
+  if (dash) dash.insertAdjacentHTML('beforeend', newsHtml);
+}
+
+// ============================================================
+// SAVES
+// ============================================================
+async function showSaves(){
+  if(!gameState)return;
+  try{const d=await API.getSaves();const slots=d.slots||{};
+    let html='<h3 style="font-family:var(--font-serif);margin-bottom:14px">💾 存档管理</h3>';
+    for(let i=1;i<=5;i++){const s=slots[String(i)];
+      html+=`<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--surface-2);gap:10px">
+        <div style="min-width:0"><span style="font-weight:600;font-size:0.84rem">槽位 ${i}</span>
+        ${s?`<div style="font-size:0.68rem;color:var(--text-secondary)">${esc(s.name)} · ${esc(s.title)} · T${s.turn}</div>`:'<div style="font-size:0.68rem;color:var(--text-tertiary)">空</div>'}</div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button onclick="doSave(${i})" style="padding:5px 12px;font-size:0.68rem;border-radius:var(--radius-sm);border:1px solid var(--surface-3);background:var(--surface-card);cursor:pointer">保存</button>
+          ${s?`<button onclick="doLoad(${i})" style="padding:5px 12px;font-size:0.68rem;border-radius:var(--radius-sm);border:1px solid var(--surface-3);background:var(--surface-card);cursor:pointer">读取</button><button onclick="doDelete(${i})" style="padding:5px 12px;font-size:0.68rem;border-radius:var(--radius-sm);border:1px solid var(--danger-bg);background:var(--surface-card);color:var(--danger);cursor:pointer">删除</button>`:''}
+        </div></div>`;
+    }
+    html+=`<div style="margin-top:14px;display:flex;gap:8px">
+      <button onclick="importSave()" style="flex:1;padding:10px;border:1px solid var(--accent);border-radius:var(--radius);background:var(--accent-bg);color:var(--accent);cursor:pointer;font-size:0.85rem">📥 导入</button>
+      <button onclick="closeModal()" style="flex:1;padding:10px;border:1px solid var(--surface-3);border-radius:var(--radius);background:var(--surface-card);cursor:pointer;font-size:0.85rem">关闭</button>
+    </div>`;
+    openModal(html);
+  }catch(e){alert('加载失败')}
+}
+async function doSave(s){try{await API.saveSlot(s);showNotification('milestone','已保存');showSaves()}catch(e){alert('保存失败')}}
+async function doLoad(s){if(!confirm(`确定读取槽位${s}？`))return;try{const d=await API.loadSlot(s);gameState=d.state;_prevTitle=d.state?.title?.title||'';closeModal();renderAll();showNotification('milestone','已读取')}catch(e){alert('读取失败')}}
+async function doDelete(s){if(!confirm(`确定删除槽位${s}？`))return;try{await API.deleteSlot(s);showSaves()}catch(e){alert('删除失败')}}
+async function importSave(){const i=document.createElement('input');i.type='file';i.accept='.json';i.onchange=async e=>{const f=e.target.files[0];if(!f)return;try{const s=JSON.parse(await f.text());if(!s.player||!s.attributes){alert('格式无效');return}await API.importState(s);gameState=s;_prevTitle=s?.title?.title||'';closeModal();renderAll();showNotification('milestone','导入成功')}catch(err){alert('导入失败: '+err.message)}};i.click()}
+
+// ============================================================
+// MODAL
+// ============================================================
+function openModal(html){const m=document.getElementById('modal');m.innerHTML=`<div class="modal-card">${html}</div>`;m.classList.add('active')}
+function closeModal(){document.getElementById('modal').classList.remove('active')}
+
+// ============================================================
+// EVENT DELEGATION
+// ============================================================
+document.addEventListener('click',function(e){
+  const cb=e.target.closest('.choice-btn');
+  if(cb&&!cb.disabled&&!isProcessing){
+    if(gameState&&gameState.stamina<=0&&cb.dataset.choice!=='__action__')return;
+    if(cb.dataset.choice)makeChoice(cb.dataset.choice);
+    return;
+  }
+  const aa=e.target.closest('.aa-item');
+  if(aa&&!aa.disabled&&!isProcessing){doActiveAction(aa.dataset.aa);return}
+});
+
+// ============================================================
+// SIDEBAR RESIZER
+// ============================================================
+(function(){
+  const sidebar=document.getElementById('sidebar');
+  const resizer=document.getElementById('sidebar-resizer');
+  if(!sidebar||!resizer)return;
+  const savedW=localStorage.getItem('sidebar-w');
+  if(savedW){sidebar.style.width=savedW+'px';document.documentElement.style.setProperty('--sidebar-w',savedW+'px')}
+  let dragging=false,startX,startW;
+  resizer.addEventListener('mousedown',e=>{dragging=true;resizer.classList.add('dragging');startX=e.clientX;startW=parseInt(getComputedStyle(sidebar).width,10);document.body.style.userSelect='none';document.body.style.cursor='col-resize'});
+  document.addEventListener('mousemove',e=>{if(!dragging)return;const w=Math.max(200,Math.min(420,startW+(e.clientX-startX)));sidebar.style.width=w+'px';document.documentElement.style.setProperty('--sidebar-w',w+'px')});
+  document.addEventListener('mouseup',()=>{if(!dragging)return;dragging=false;resizer.classList.remove('dragging');document.body.style.userSelect='';document.body.style.cursor='';localStorage.setItem('sidebar-w',parseInt(getComputedStyle(sidebar).width,10))});
+})();
+
+// Init
+showScreen('cover');
+</script>
+</body>
+</html>
