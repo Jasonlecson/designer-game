@@ -129,13 +129,16 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 
 不要让女主一直处于"苦熬"状态。挫折之后要有回弹，低谷之后要有光亮。职业生涯是马拉松，不是持续的泥潭。
 
-## 核心属性（1-15分）
+## 核心属性（经验值累积制，1-20级）
 审美判断力 — 视觉品味、风格把控、设计决策
 执行能力   — 落地速度、改稿效率、抗压韧性
 商业思维   — 定价谈判、理解客户需求、市场嗅觉
 表达能力   — 提案说服、建立人脉、行业声誉
 创意深度   — 概念思考、原创性、独立判断
 作品集厚度 — 综合产出指标，积累优质作品
+
+属性等级由后端经验值公式自动计算（Level = floor(sqrt(XP/20))）。
+你不需要输出具体数值，只需要判断趋势。
 
 ## 时间尺度（CRITICAL）
 每个回合代表**约1周**的真实时间。叙事体现周度节奏——项目执行4-8周，面试1-3周。选项使用周度语言（"这周""下周"）。当前日历日期和季节会注入上下文：
@@ -155,13 +158,11 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 
 短期后果：本回合的直接结果（≤12字），如「甲方同意了方案」「熬夜赶工到凌晨」
 属性影响：格式 "属性名±数字"，如 "审美+1 执行-2"
-## 职业成长节奏（CRITICAL — 必须严格遵循）
-- 属性增长必须缓慢写实：大部分回合变化为 0 或 ±1
-- 从 5 升到 6 需要持续投入，从 8 升到 9 需要重大突破
-- 作品集厚度增长尤为缓慢：每回合涨幅不超过 +1，且只有真正产出作品时才提升
-- 每回合属性总变化幅度控制在 -2 ~ +2 之间（精力消耗不计入）
-- 正负必须平衡：纯正面的回合极少，好的选择往往附带代价
-- 过高属性（≥8）会自然遇到瓶颈期，很难继续上升
+## 职业成长节奏
+- 属性由经验值累积自动升级，你只需判断趋势方向
+- 大部分回合趋势应为 flat，真正成长/挫折时才标注 up/down
+- 高等级（≥15）极难继续成长，标注 up 的频率应该显著降低
+- 作品集厚度 up 仅在实际完成作品或发布成果时标注
 
 ## 输出格式（严格JSON，只输出JSON，不要任何额外文字）
 {
@@ -172,7 +173,7 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
     {"id": "C", "text": "选项C（≤20字）", "hint": "短期后果（≤12字）", "effect": "表达+1 精力+15"}
   ],
   "atmosphere": "场景氛围（≤10字）",
-  "attr_display": {"审美判断力": 7, "执行能力": 6, "商业思维": 5, "表达能力": 6, "创意深度": 4, "作品集厚度": 3},
+  "attr_trend": {"审美判断力": "up", "执行能力": "flat", "商业思维": "up", "表达能力": "flat", "创意深度": "flat", "作品集厚度": "up"},
   "stamina_change": -8,
   "savings_change": 0,
   "event_tag": "项目推进 / 行业事件 / 日常 / 转折点 / 倦怠预警",
@@ -182,6 +183,13 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
   "company_update": {"name": "XX设计工作室", "position": "初级设计师", "action": "入职"}
 }
 
+## attr_trend 规则
+- 每个属性标注本回合的趋势：up（正向成长）/ down（退步下滑）/ flat（平稳不变）
+- 后端自动将趋势转为经验值（up→+15~35XP, down→-15~35XP）
+- 属性增长缓慢写实：不会每回合都 up，大部分回合应该是 flat
+- 只有真正有成长的回合才标 up，遭遇挫折才标 down
+- 作品集厚度仅在完成实际作品时标 up
+
 ## stamina_change / savings_change 规则
 - stamina_change: 本轮精力的变化量（正=休息恢复，负=消耗），范围 -15 ~ +20
 - savings_change: 储蓄的增减（正=收入进账/项目酬劳，负=消费/交租/降薪），单位：元
@@ -190,10 +198,9 @@ SYSTEM_PROMPT = '''# 你是平面设计师模拟器的 Game Master (DM)
 
 ## choice.effect 规则
 - effect 格式："属性简称±数字 属性简称±数字"，空格分隔
-- 属性简称映射：审美=审美判断力 执行=执行能力 商业=商业思维 表达=表达能力 创意=创意深度 作品=作品集厚度 精力=精力值 储蓄=储蓄
-- 必须至少包含一个属性变化
-- 示例: "审美+1" / "执行-1 精力-10" / "商业+1 表达+1 精力-5"
-- 涨属性的选项必须伴随代价（精力消耗、储蓄消耗、或其他属性下降）
+- effect 格式："属性简称±级数"，空格分隔。+1 表示加一个等级所需的经验值（等级越高，所需经验越多）
+- 必须至少包含一个属性变化，涨属性必须伴随代价
+- 示例: "审美+1"/"执行-1 精力-10"/"商业+1 表达+1 精力-5"
 
 ## company_update 规则
 - 游戏开场时必须初始化公司信息（action: "入职"）
@@ -311,13 +318,11 @@ def validate_and_fix_result(result, turn_count, attrs):
         result['atmosphere'] = '设计工作室的日常'
     if not result.get('event_tag'):
         result['event_tag'] = '日常'
-    if not result.get('attr_display'):
-        result['attr_display'] = attrs
-    # Ensure all 6 attributes are present
+    if not result.get('attr_trend'):
+        result['attr_trend'] = {}
     for key in ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']:
-        if key not in result['attr_display']:
-            result['attr_display'][key] = attrs.get(key, 5)
-        result['attr_display'][key] = max(1, min(ATTR_CAP, int(result['attr_display'][key])))
+        if key not in result['attr_trend']:
+            result['attr_trend'][key] = 'flat'
     # Stamina & savings
     if 'stamina_change' not in result:
         result['stamina_change'] = -5
@@ -414,24 +419,107 @@ def apply_company_update(state, company_update):
 # ============================================================
 # (moved up for milestone reference)
 ATTR_CAP = 15  # Max attribute value (was 10)
+
+# ============================================================
+# XP-based attribute system (20-point scale)
+# ============================================================
+XP_PER_LEVEL_BASE = 20  # Level = floor(sqrt(xp / 20)), max level 20
+
+def xp_to_level(xp):
+    '''Convert accumulated XP to level (1-20). XP can be negative.'''
+    if xp <= 0:
+        return 1
+    level = int((xp / XP_PER_LEVEL_BASE) ** 0.5)
+    return max(1, min(20, level))
+
+def level_to_xp_target(level):
+    '''XP needed to reach this level from 0.'''
+    return level * level * XP_PER_LEVEL_BASE
+
+def xp_for_level_up(current_level):
+    '''XP needed to go from current_level to current_level+1.'''
+    return level_to_xp_target(current_level + 1) - level_to_xp_target(current_level)
+
+def apply_trend_to_xp(state, attr_trends):
+    '''Apply LLM trend directions (up/down/flat) as XP changes.
+    Returns dict of {attr: xp_delta} for notification.'''
+    deltas = {}
+    for attr, trend in (attr_trends or {}).items():
+        if trend == 'up':
+            delta = random.randint(15, 35)
+        elif trend == 'down':
+            delta = -random.randint(15, 35)
+        else:
+            delta = 0
+        if delta != 0:
+            xp = state.get('attribute_xp', {})
+            xp[attr] = xp.get(attr, 0) + delta
+            state['attribute_xp'] = xp
+            deltas[attr] = delta
+    return deltas
+
+def xp_to_attrs(state):
+    '''Derive attribute levels from XP.'''
+    xp_dict = state.get('attribute_xp', {})
+    attrs = {}
+    ALL_ATTRS = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']
+    for attr in ALL_ATTRS:
+        attrs[attr] = xp_to_level(xp_dict.get(attr, 0))
+    return attrs
+
+def apply_effect_xp(state, effect_str):
+    '''Apply choice effect like '审美+1 执行-2' directly to XP.
+    +1 means add enough XP for 1 level at current level.
+    Returns {attr: level_change} for notification.'''
+    level_changes = {}
+    if not effect_str:
+        return level_changes
+    SHORT_MAP = {
+        '审美': '审美判断力', '执行': '执行能力', '商业': '商业思维',
+        '表达': '表达能力', '创意': '创意深度', '作品': '作品集厚度'
+    }
+    parts = effect_str.strip().split()
+    xp = state.get('attribute_xp', {})
+    for part in parts:
+        for short, full in SHORT_MAP.items():
+            if part.startswith(short):
+                try:
+                    change = int(part[len(short):])
+                except (ValueError, IndexError):
+                    continue
+                current_level = xp_to_level(xp.get(full, 0))
+                if change > 0:
+                    xp_delta = xp_for_level_up(current_level) * change
+                else:
+                    xp_delta = xp_for_level_up(max(1, current_level + change)) * change
+                old_level = xp_to_level(xp.get(full, 0))
+                xp[full] = xp.get(full, 0) + xp_delta
+                new_level = xp_to_level(xp[full])
+                if new_level != old_level:
+                    level_changes[full] = new_level - old_level
+                break
+    state['attribute_xp'] = xp
+    return level_changes
+
+# ============================================================
 TITLE_THRESHOLDS = [
     {'title': '见习设计师',     'stage': '萌芽期', 'attrs': {}},
-    {'title': '初级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 4, '执行能力': 4}},
-    {'title': '中级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 7, '执行能力': 7, '作品集厚度': 5}},
-    {'title': '高级设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 10, '执行能力': 9, '作品集厚度': 7, '表达能力': 7}},
-    {'title': '资深设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 11, '执行能力': 10, '作品集厚度': 10, '表达能力': 9, '商业思维': 7}},
-    {'title': '设计总监',       'stage': '巅峰期', 'attrs': {'审美判断力': 12, '执行能力': 11, '作品集厚度': 11, '表达能力': 10, '商业思维': 10, '创意深度': 10}},
-    {'title': '创意合伙人',     'stage': '巅峰期', 'attrs': {'审美判断力': 13, '执行能力': 12, '作品集厚度': 13, '表达能力': 12, '商业思维': 12, '创意深度': 12}},
-    {'title': '独立设计大师',   'stage': '传奇',   'attrs': {'审美判断力': 14, '作品集厚度': 14, '表达能力': 13, '创意深度': 13}},
+    {'title': '初级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 5, '执行能力': 5}},
+    {'title': '中级设计师',     'stage': '成长期', 'attrs': {'审美判断力': 8, '执行能力': 8, '作品集厚度': 6}},
+    {'title': '高级设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 11, '执行能力': 10, '作品集厚度': 8, '表达能力': 8}},
+    {'title': '资深设计师',     'stage': '成熟期', 'attrs': {'审美判断力': 13, '执行能力': 12, '作品集厚度': 11, '表达能力': 10, '商业思维': 9}},
+    {'title': '设计总监',       'stage': '巅峰期', 'attrs': {'审美判断力': 15, '执行能力': 13, '作品集厚度': 13, '表达能力': 12, '商业思维': 12, '创意深度': 12}},
+    {'title': '创意合伙人',     'stage': '巅峰期', 'attrs': {'审美判断力': 17, '执行能力': 15, '作品集厚度': 16, '表达能力': 15, '商业思维': 15, '创意深度': 15}},
+    {'title': '独立设计大师',   'stage': '传奇',   'attrs': {'审美判断力': 18, '作品集厚度': 18, '表达能力': 16, '创意深度': 16}},
 ]
 
 ACHIEVEMENTS = [
     {'id': 'first_project',  'name': '初出茅庐', 'desc': '完成第一个设计项目', 'icon': '🌱'},
-    {'id': 'portfolio_7',    'name': '作品等身', 'desc': '作品集厚度达到 7',  'icon': '📦'},
-    {'id': 'portfolio_12',   'name': '业界标杆', 'desc': '作品集厚度达到 12', 'icon': '🏆'},
-    {'id': 'expression_10',  'name': '金字招牌', 'desc': '表达能力达到 10',   'icon': '🤝'},
-    {'id': 'expression_13',  'name': '德高望重', 'desc': '表达能力达到 13',   'icon': '👑'},
-    {'id': 'aesthetic_12',   'name': '审美大师', 'desc': '审美判断力达到 12', 'icon': '🎨'},
+    {'id': 'portfolio_10',   'name': '作品等身', 'desc': '作品集厚度达到 10', 'icon': '📦'},
+    {'id': 'portfolio_15',   'name': '业界标杆', 'desc': '作品集厚度达到 15', 'icon': '🏆'},
+    {'id': 'expression_12',  'name': '金字招牌', 'desc': '表达能力达到 12',   'icon': '🤝'},
+    {'id': 'expression_16',  'name': '德高望重', 'desc': '表达能力达到 16',   'icon': '👑'},
+    {'id': 'aesthetic_14',   'name': '审美大师', 'desc': '审美判断力达到 14', 'icon': '🎨'},
     {'id': 'stamina_low',    'name': '至暗时刻', 'desc': '精力值降到 10 以下','icon': '🌑'},
     {'id': 'stamina_recover','name': '涅槃重生', 'desc': '精力从低谷恢复到 70+','icon': '🔥'},
     {'id': 'npc_3_related',  'name': '社交达人', 'desc': '与 3 位 NPC 建立关系', 'icon': '💬'},
@@ -993,11 +1081,11 @@ def check_achievements(state, prev_stamina=None):
             new_unlocks.append(ach_id)
 
     # Attribute-based
-    if attrs.get('作品集厚度', 0) >= 7: unlock('portfolio_7')
-    if attrs.get('作品集厚度', 0) >= 12: unlock('portfolio_12')
-    if attrs.get('表达能力', 0) >= 10: unlock('expression_10')
-    if attrs.get('表达能力', 0) >= 13: unlock('expression_13')
-    if attrs.get('审美判断力', 0) >= 12: unlock('aesthetic_12')
+    if attrs.get('作品集厚度', 0) >= 10: unlock('portfolio_10')
+    if attrs.get('作品集厚度', 0) >= 15: unlock('portfolio_15')
+    if attrs.get('表达能力', 0) >= 12: unlock('expression_12')
+    if attrs.get('表达能力', 0) >= 16: unlock('expression_16')
+    if attrs.get('审美判断力', 0) >= 14: unlock('aesthetic_14')
 
     # Stamina
     if stamina <= 10: unlock('stamina_low')
@@ -1014,7 +1102,7 @@ def check_achievements(state, prev_stamina=None):
 
     # All-rounder
     all_attrs = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']
-    if all(attrs.get(k, 0) >= 8 for k in all_attrs): unlock('all_rounder')
+    if all(attrs.get(k, 0) >= 10 for k in all_attrs): unlock('all_rounder')
 
     # First project — check if any log entry has event_tag '项目推进'
     if any(e.get('event_tag') == '项目推进' for e in state.get('story_log', [])):
@@ -1259,6 +1347,7 @@ def api_new_game():
         'turn_count': 0,
         'stamina': 80,
         'savings': 3000,
+        'attribute_xp': {k: level_to_xp_target(v) for k, v in attributes.items()},
         'start_date': datetime.now().isoformat(),
         'created_at': datetime.now().isoformat(),
     }
@@ -1278,6 +1367,9 @@ def api_new_game():
         state['npcs'] = apply_npc_updates(state['npcs'], result['npc_updates'])
     if result.get('company_update'):
         apply_company_update(state, result['company_update'])
+    # XP: apply trends, derive attributes
+    apply_trend_to_xp(state, result.get('attr_trend', {}))
+    state['attributes'] = xp_to_attrs(state)
 
     state['story_log'].append({
         'turn': 1,
@@ -1285,10 +1377,9 @@ def api_new_game():
         'narrative': result['narrative'],
         'choices': result['choices'],
         'atmosphere': result.get('atmosphere', ''),
-        'attr_display': result['attr_display'],
+        'attr_display': dict(state['attributes']),
         'event_tag': result.get('event_tag', '游戏开始'),
     })
-    state['attributes'] = result['attr_display']
     state['turn_count'] = 1
     state['title'] = calculate_title(state['attributes'])
     state['unlocked_achievements'] = []
@@ -1344,7 +1435,7 @@ def api_action():
     # Trait stamina penalty for freelancer
     if trait_def.get('stamina_penalty'):
         state['stamina'] = max(0, state['stamina'] - trait_def.get('stamina_penalty', 0))
-    applied_effects = apply_choice_effects(state, chosen_effect)
+    applied_effects = apply_effect_xp(state, chosen_effect)
 
     # F-EXTRA: Forced rest when stamina depleted
     is_forced_rest = False
@@ -1379,27 +1470,19 @@ def api_action():
         apply_company_update(state, result['company_update'])
 
     turn = state['turn_count'] + 1
+    # XP: apply LLM trends, derive attributes
+    apply_trend_to_xp(state, result.get('attr_trend', {}))
+    state['attributes'] = xp_to_attrs(state)
     entry = {
         'turn': turn,
         'player_action': action_text,
         'narrative': result['narrative'],
         'choices': result['choices'],
         'atmosphere': result.get('atmosphere', ''),
-        'attr_display': result['attr_display'],
+        'attr_display': dict(state['attributes']),
         'event_tag': result.get('event_tag', '日常'),
     }
     state['story_log'].append(entry)
-    # F1: Blend LLM attr_display as reference with deterministic effects
-    llm_attrs = result.get('attr_display', state['attributes'].copy())
-    for key in ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']:
-        llm_val = int(llm_attrs.get(key, state['attributes'].get(key, 5)))
-        deterministic = state['attributes'].get(key, 5)
-        # Blend: if LLM disagrees by >1, trust deterministic; if ±1, average
-        if abs(llm_val - deterministic) <= 1:
-            state['attributes'][key] = llm_val
-        else:
-            # LLM drifted too far, bring it back toward deterministic
-            state['attributes'][key] = max(1, min(ATTR_CAP, int((deterministic + llm_val) / 2)))
     state['stamina'] = max(0, min(100, state.get('stamina', 80) + result.get('stamina_change', -5)))
     state['savings'] = max(0, state.get('savings', 3000) + result.get('savings_change', 0))
     state['turn_count'] = turn

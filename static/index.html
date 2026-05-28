@@ -1630,7 +1630,7 @@ function renderAttrs(attrs) {
     const cls = v >= 7 ? 'high' : v >= 4 ? 'mid' : 'low';
     html += `<div class="attr-row">
       <div class="attr-header"><span class="attr-name">${icons[k]||''} ${k}</span><span class="attr-value ${cls}">${v}</span></div>
-      <div class="attr-bar"><div class="attr-fill ${cls}" style="width:${(v/15*100).toFixed(1)}%"></div></div>
+      <div class="attr-bar"><div class="attr-fill ${cls}" style="width:${(v/20*100).toFixed(1)}%"></div></div>
     </div>`;
   }
   list.innerHTML = html;
