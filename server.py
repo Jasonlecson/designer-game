@@ -296,21 +296,25 @@ def call_llm(messages, api_base, api_key, model):
             'response_format': {'type': 'json_object'}
         }
         resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
-        # If response_format causes "not match" error, retry without it
-        if resp.status_code >= 400:
-            # Diagnostic: log the failing prompt
-            try:
-                with open('_debug_prompt_fail.txt', 'w', encoding='utf-8') as f:
-                    for i, m in enumerate(messages):
-                        f.write(f'=== Message {i} ({m["role"]}) [{len(m["content"])} chars] ===\n')
-                        f.write(m['content'][:500])
-                        f.write('\n\n')
-                with open('_debug_response_fail.txt', 'w', encoding='utf-8') as f:
-                    f.write(f'Status: {resp.status_code}\n')
-                    f.write(resp.text[:2000])
-            except: pass
+        # Diagnostic: log ALL responses
+        try:
+            with open('_debug_prompt_fail.txt', 'w', encoding='utf-8') as f:
+                for i, m in enumerate(messages):
+                    f.write(f'=== Message {i} ({m["role"]}) [{len(m["content"])} chars] ===\n')
+                    f.write(m['content'][:500])
+                    f.write('\n\n')
+            with open('_debug_response_fail.txt', 'w', encoding='utf-8') as f:
+                f.write(f'Status: {resp.status_code}\n')
+                f.write(f'Headers: {dict(resp.headers)}\n')
+                f.write(f'Body[:1000]: {resp.text[:1000]}')
+        except: pass
+        if resp.status_code != 200:
             payload.pop('response_format', None)
             resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
+        # Guard against HTML error pages
+        raw = resp.text.strip()
+        if raw.startswith('<!') or raw.startswith('<html'):
+            return None, f'API返回HTML: {raw[:200]}'
         if resp.status_code != 200:
             return None, f'API错误 {resp.status_code}: {resp.text[:200]}'
         # Guard against HTML error pages returned as 200
