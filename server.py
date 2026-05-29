@@ -1564,12 +1564,11 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
         opening_prompt += '每个回合代表约1周。只输出纯JSON，不要```json标记，不要任何额外文字。'
         messages.append({'role': 'user', 'content': opening_prompt})
 
-    # 10: Project decision prompt
+    # 10: Project decision prompt (append to messages, not parts)
     phase_changed = state.pop('_project_phase_changed', '')
     if phase_changed:
         proj = state.get('current_project', {})
-        parts.append(f'\n# 项目阶段变更: {phase_changed} — {proj.get("name","")}')
-        parts.append('请在本回合选项中包含一个与项目推进相关的决策（如：选择设计风格、如何回应甲方反馈、是否加班赶工等）。')
+        messages.append({'role': 'user', 'content': f'【项目阶段变更】{phase_changed} — {proj.get("name","")}\n请在本回合选项中包含一个与项目推进相关的决策（设计风格/回应甲方/是否加班等）。'})
 
     return messages
 
