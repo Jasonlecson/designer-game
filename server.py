@@ -951,10 +951,13 @@ def advance_project_phase(state):
         proj['phase'] = '交付'; phases_progressed = True
     if progress >= 1.0 and proj.get('phase') in ('交付', '改稿'):
         proj['phase'] = '完成'; phases_progressed = True
-        # Completion reward
+        # Completion reward — add XP (not direct level)
         state['savings'] = state.get('savings', 0) + proj.get('budget', 5000)
-        state['attributes']['作品集厚度'] = min(ATTR_CAP, state.get('attributes', {}).get('作品集厚度', 1) + 1)
-        state['attributes']['商业思维'] = min(ATTR_CAP, state.get('attributes', {}).get('商业思维', 3) + 1)
+        xp = state.get('attribute_xp', {})
+        xp['作品集厚度'] = xp.get('作品集厚度', 0) + 200
+        xp['商业思维'] = xp.get('商业思维', 0) + 200
+        state['attribute_xp'] = xp
+        state['attributes'] = xp_to_attrs(state)
         # Record to portfolio
         add_portfolio_entry(state, proj)
 
