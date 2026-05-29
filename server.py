@@ -1481,12 +1481,12 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
         month_num = datetime.now().month
     season_hint = get_season_llm_hint(month_num)
     parts.append(f'时间: {game_date} {season} | {season_hint["tag"]} {season_hint["hint"][:30]}')
-    # NPCs (compact)
+    # NPCs (with relation + desc)
     npc_parts = []
     for n in npcs[:6]:
         rel = n.get('relation','')
-        rel_short = rel if rel != '待剧情展开' else ''
-        npc_parts.append(f'{n["name"]}({n["role"]}{":"+rel_short if rel_short else ""})')
+        desc = n.get('desc','')
+        npc_parts.append(f'{n["name"]}({n["role"]}{"|"+rel if rel and rel!="待剧情展开" else ""}{"|"+desc[:20] if desc else ""})')
     parts.append(f'NPC: {", ".join(npc_parts)}')
 
     if state.get('current_project'):
@@ -1506,6 +1506,9 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
     trait = state.get('trait', {})
     if trait:
         parts.append(f'特质: {trait.get("name","")}—{trait.get("desc","")[:40]}')
+    trait_ctx = get_trait_context(state)
+    if trait_ctx:
+        parts.append(f'特质倾向: {trait_ctx}')
     # Arc
     arc = state.get('_narrative_arc')
     if arc:
@@ -1516,10 +1519,12 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
     # Crisis
     if state.get('_savings_crisis_level', 0) > 0:
         parts.append(f'财务危机 Lv{state.get("_savings_crisis_level")}')
-    # Recent turns (3 instead of 5)
+    # Recent turns (with narrative context — LLM has no memory between calls)
     parts.append('最近:')
     for e in state.get('story_log', [])[-3:]:
-        parts.append(f'  [{e.get("event_tag","")}] {e.get("player_action","")[:20]}')
+        parts.append(f'  [{e.get("event_tag","")}] {e.get("player_action","")[:30]}')
+        if e.get('narrative'):
+            parts.append(f'  → {e["narrative"][:80]}')
     msg = '\n'.join(parts)
 
     messages = [
