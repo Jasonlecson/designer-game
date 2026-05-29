@@ -296,6 +296,10 @@ def call_llm(messages, api_base, api_key, model):
             'response_format': {'type': 'json_object'}
         }
         resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
+        # If response_format causes "not match" error, retry without it
+        if resp.status_code >= 400:
+            payload.pop('response_format', None)
+            resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
         if resp.status_code != 200:
             return None, f'API错误 {resp.status_code}: {resp.text[:200]}'
         data = resp.json()
