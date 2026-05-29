@@ -236,6 +236,8 @@ function processActionResponse(d) {
   if (d.project_phase_hint) showNotification('milestone', '📋 项目进入「' + d.project_phase_hint + '」阶段');
   if (d.result) showNotification('npc', '⚡ ' + d.result);
   if (d.ending) { window._pendingEnding = d.ending; }
+  if (d.trend) gameState.trend = d.trend;
+  if (d.industry_news) gameState.industry_news = d.industry_news;
   _prevTitle = (d.title && d.title.title) || _prevTitle;
 }
 

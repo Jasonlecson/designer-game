@@ -2133,10 +2133,12 @@ def api_npc_interact():
         save_state(state)
     return jsonify({
         'ok': True,
+        'result': f'与{npc["name"]}互动：{effect or action["text"]}',
         'npc_name': npc['name'],
         'action_text': action['text'],
         'effect': effect,
         'stamina': state['stamina'],
+        'savings': state.get('savings', 0),
         'attributes': state['attributes'],
         'npcs': state['npcs'],
     })
