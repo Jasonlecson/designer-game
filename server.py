@@ -457,9 +457,15 @@ def validate_and_fix_result(result, turn_count, attrs):
         result['event_tag'] = '日常'
     if not result.get('attr_trend'):
         result['attr_trend'] = {}
+    # Enforce: max 2 "up" trends per turn, rest → "flat"
+    up_count = 0
     for key in ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']:
         if key not in result['attr_trend']:
             result['attr_trend'][key] = 'flat'
+        elif result['attr_trend'][key] == 'up':
+            up_count += 1
+            if up_count > 2:
+                result['attr_trend'][key] = 'flat'
     # Stamina & savings
     if 'stamina_change' not in result:
         result['stamina_change'] = -5
@@ -576,6 +582,15 @@ def xp_for_level_up(current_level):
 def apply_trend_to_xp(state, attr_trends):
     '''Apply LLM trend directions (up/down/flat) as XP changes.
     Returns dict of {attr: xp_delta} for notification.'''
+    GOAL_BOOST = {
+        '成为顶级独立设计师': {'审美判断力': 10, '创意深度': 10},
+        '做到创意总监/合伙人': {'商业思维': 10, '表达能力': 10},
+        '创立自己的设计品牌/厂牌': {'商业思维': 10, '创意深度': 10},
+        '成为行业话语权拥有者': {'表达能力': 10, '创意深度': 10},
+        '活着就好': {'执行能力': 10},
+    }
+    goal = state.get('player', {}).get('goal', '')
+    boosts = GOAL_BOOST.get(goal, {})
     deltas = {}
     for attr, trend in (attr_trends or {}).items():
         if trend == 'up':
@@ -584,6 +599,9 @@ def apply_trend_to_xp(state, attr_trends):
             delta = -random.randint(15, 35)
         else:
             delta = 0
+        # Goal bonus
+        if delta > 0 and attr in boosts:
+            delta += boosts[attr]
         if delta != 0:
             xp = state.get('attribute_xp', {})
             xp[attr] = xp.get(attr, 0) + delta
@@ -1424,18 +1442,31 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
         f'当前头衔: {state.get("title",{}).get("title","见习设计师")}（{state.get("title",{}).get("stage","萌芽期")}）',
         f'资源: {player.get("resources","?")}, 节奏: {player.get("pace","标准")}',
         f'当前回合: 第{story_len+1}回合',
-        '',
-        f'# 当前公司: {state.get("company",{}).get("name","待定")} | 职位: {state.get("company",{}).get("position","设计师")}',
-        '',
-        '# 资源',
-        f'  精力值: {state.get("stamina",80)}/100',
-        f'  储蓄: {state.get("savings",3000)}元',
-        '',
-        '# 属性',
     ]
+    # Goal-specific guidance for LLM
+    goal = player.get('goal', '')
+    goal_hints = {
+        '成为顶级独立设计师': '倾向独立创作、高端私单、设计竞赛的事件。',
+        '做到创意总监/合伙人': '倾向晋升、团队管理、商业谈判的事件。',
+        '创立自己的设计品牌/厂牌': '倾向创业、品牌建设、融资的事件。',
+        '成为行业话语权拥有者': '倾向论坛曝光、媒体、行业影响力的事件。',
+        '活着就好': '倾向稳定收入、轻松节奏、人际关系的事件。',
+    }
+    if goal in goal_hints:
+        parts.append('')
+        parts.append(f'# 长期目标引导: {goal_hints[goal]}')
+    parts.append('')
+    parts.append(f'# 当前公司: {state.get("company",{}).get("name","待定")} | 职位: {state.get("company",{}).get("position","设计师")}')
+    parts.append('')
+    parts.append('# 资源')
+    parts.append(f'  精力值: {state.get("stamina",80)}/100')
+    parts.append(f'  储蓄: {state.get("savings",3000)}元')
+    parts.append('')
+    parts.append('# 属性')
     for k, v in attrs.items():
-        bar = '\u2587' * v + '\u2581' * (10 - v)
-        parts.append(f'  {k}: {bar} ({v}/10)')
+        bar_len = max(1, min(20, v))
+        bar = '\u2587' * bar_len + '\u2581' * max(0, 20 - bar_len)
+        parts.append(f'  {k}: {bar} ({v}/20)')
 
     parts.append('')
 
@@ -1905,6 +1936,7 @@ def api_action():
         'attributes': state['attributes'],
         'stamina': state['stamina'],
         'savings': state['savings'],
+        'attribute_xp': state.get('attribute_xp', {}),
         'game_date': get_game_date(state),
         'player_age': int(state.get('player', {}).get('age', '24') or 24) + state['turn_count'] // 48,
         'title': state['title'],
@@ -2179,7 +2211,7 @@ def api_project():
             'deadline_turns': _random.choice([5, 6, 7, 8]),
             'quality': max(10, state.get('attributes', {}).get('审美判断力', 5) * 10),
             'client_satisfaction': max(10, state.get('attributes', {}).get('表达能力', 5) * 10),
-            'phase': '执行中',
+            'phase': '竞标',
             'start_turn': state.get('turn_count', 0)
         }
         state['current_project'] = proj
@@ -2357,6 +2389,7 @@ def api_active_action():
         'attributes': state['attributes'],
         'stamina': state['stamina'],
         'savings': state['savings'],
+        'attribute_xp': state.get('attribute_xp', {}),
         'game_date': get_game_date(state),
         'player_age': int(state.get('player', {}).get('age', '24') or 24) + state['turn_count'] // 48,
         'title': state['title'],
