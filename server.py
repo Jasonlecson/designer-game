@@ -1909,6 +1909,8 @@ def _api_action_impl():
         messages.append({'role': 'user', 'content': check_text})
 
     # I5-A / 8: Inject spec event & year review
+    spec_event = check_spec_event(state)
+    year_review = check_year_review(state)
     if spec_event:
         messages.append({'role': 'user', 'content': f'【专精事件】{spec_event} 请融入叙事。'})
     if year_review:
@@ -1971,12 +1973,6 @@ def _api_action_impl():
 
     # 6: Career stage challenges
     challenge = check_career_challenge(state)
-
-    # I5-A: Specialization event
-    spec_event = check_spec_event(state)
-
-    # 8: Year review
-    year_review = check_year_review(state)
 
     # S3: Process weekly economy
     economy_event = process_economy(state)
