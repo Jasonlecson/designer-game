@@ -296,17 +296,17 @@ def call_llm(messages, api_base, api_key, model):
             'response_format': {'type': 'json_object'}
         }
         resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
-        # Diagnostic: log ALL responses
+        # Diagnostic: log ALL responses (append, not overwrite)
+        from datetime import datetime as _dt
+        ts = _dt.now().strftime('%H%M%S%f')
         try:
-            with open('_debug_prompt_fail.txt', 'w', encoding='utf-8') as f:
-                for i, m in enumerate(messages):
-                    f.write(f'=== Message {i} ({m["role"]}) [{len(m["content"])} chars] ===\n')
-                    f.write(m['content'][:500])
-                    f.write('\n\n')
-            with open('_debug_response_fail.txt', 'w', encoding='utf-8') as f:
+            with open(f'_debug_{ts}_prompt.txt', 'w', encoding='utf-8') as f:
                 f.write(f'Status: {resp.status_code}\n')
-                f.write(f'Headers: {dict(resp.headers)}\n')
-                f.write(f'Body[:1000]: {resp.text[:1000]}')
+                for i, m in enumerate(messages):
+                    f.write(f'=== M{i} {m["role"]} {len(m["content"])}c ===\n{m["content"]}\n\n')
+            with open(f'_debug_{ts}_resp.txt', 'w', encoding='utf-8') as f:
+                f.write(f'Status: {resp.status_code}\n')
+                f.write(resp.text[:2000])
         except: pass
         if resp.status_code != 200:
             payload.pop('response_format', None)
