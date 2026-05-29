@@ -2091,16 +2091,9 @@ def api_npc_interact():
         return jsonify({'error': '精力不足'}), 400
     state['stamina'] = max(0, min(100, stamina - cost))
 
-    # Apply effects — changes state, which influences next LLM call
+    # Apply effects via XP system
     effect = action['effect']
-    attrs = state.get('attributes', {})
-    for short, full in [('审美', '审美判断力'), ('执行', '执行能力'), ('商业', '商业思维'),
-                         ('表达', '表达能力'), ('创意', '创意深度')]:
-        if f'{short}+1' in effect:
-            attrs[full] = min(ATTR_CAP, attrs.get(full, 5) + 1)
-        if f'{short}-1' in effect:
-            attrs[full] = max(1, attrs.get(full, 5) - 1)
-    state['attributes'] = attrs
+    apply_effect_xp(state, effect)
 
     # Update NPC relation
     if npc.get('relation') == '待剧情展开':
