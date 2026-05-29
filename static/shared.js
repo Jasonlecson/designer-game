@@ -464,7 +464,7 @@ function buildFocusButtons() {
   const left = cur.turns_left || 0;
   let html = '<div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">🎯 近期重心 ' + (current ? `(${left}周)` : '') + '</div>';
   FOCUS_OPTIONS.forEach(f => {
-    const sel = current === f.type ? 'style="border-color:var(--accent);background:var(--accent-bg)"' : '';
+    const sel = current === f.type ? 'style="border-color:var(--accent);background:var(--accent);color:#fff;font-weight:600"' : '';
     html += `<button class="focus-btn" ${sel} onclick="setGameFocus('${f.type}')">${f.icon} ${f.label}</button>`;
   });
   return html;
