@@ -1,6 +1,7 @@
 // ============================================================
-// shared.js — 前后端通信 & 通用逻辑
+// shared.js — 前后端通信 & 全部业务逻辑
 // 由 mobile.html 和 desktop.html 共同引用
+// 每个 HTML 文件只需提供：renderAll() / renderTab() / 渲染函数 / CSS / HTML
 // ============================================================
 
 // ========== API Layer ==========
@@ -106,11 +107,17 @@ const TAG_COLORS = {
 
 const AVATAR_COLORS = ['#d4846a','#6b8f71','#7b8fa1','#c4a43e','#8e6b9e','#c4755e'];
 
-// ========== Game State ==========
+// ========== Global State ==========
 let gameState = null;
 let isProcessing = false;
 let _prevTitle = '';
+let currentScreen = 'cover';
+let currentTab = 'dashboard';
+let selections = {origin:'',resources:'',goal:'',pace:''};
+let createStep = 0;
+let currentPlayer = {name:'林知夏',age:'24',city:'上海',custom_origin:'',specialization:''};
 
+// ========== State Update ==========
 function updateGameState(d) {
   if (d.state) gameState = d.state;
   if (d.entry) gameState.story_log.push(d.entry);
@@ -128,7 +135,6 @@ function updateGameState(d) {
   if (d.trait) gameState.trait = d.trait;
   if (d.stamina_status) gameState.stamina_status = d.stamina_status;
   if (d.status_debuff) gameState.status_debuff = d.status_debuff;
-  if (d.trait) gameState.trait = d.trait;
   if (d.turn) gameState.turn_count = d.turn;
   if (d.npc_pending) gameState._npc_pending = d.npc_pending;
 }
@@ -148,25 +154,12 @@ function esc(s) {
   div.textContent = s;
   return div.innerHTML;
 }
-
 function formatNarrative(text) {
   if (!text) return '';
   return text.split('\n').filter(l => l.trim()).map(l => `<p>${esc(l)}</p>`).join('');
 }
-
-function attrClass(v) {
-  return v >= 7 ? 'high' : v >= 4 ? 'mid' : 'low';
-}
-
-function attrColor(v) {
-  return v >= 7 ? '#6b8f71' : v >= 4 ? '#d4a853' : '#d4846a';
-}
-
-function getStaminaClass(status) {
-  const map = { '精力充沛':'vigorous','正常':'normal','疲劳':'fatigued','严重疲劳':'exhausted','透支':'critical','濒临崩塌':'critical' };
-  return map[status] || 'normal';
-}
-
+function attrClass(v) { return v >= 7 ? 'high' : v >= 4 ? 'mid' : 'low'; }
+function attrColor(v) { return v >= 7 ? '#6b8f71' : v >= 4 ? '#d4a853' : '#d4846a'; }
 function formatDate(turnCount) {
   if (!gameState || !gameState.start_date) return `第 ${turnCount} 回合`;
   try {
@@ -175,34 +168,7 @@ function formatDate(turnCount) {
     return `${d.getFullYear()}年${d.getMonth()+1}月 · 第${turnCount}周`;
   } catch(e) { return `第 ${turnCount} 回合`; }
 }
-
-function getMonthlySalary() {
-  const titles = {
-    '见习设计师':3500,'初级设计师':5000,'中级设计师':8000,
-    '高级设计师':12000,'资深设计师':18000,'设计总监':25000,
-    '创意合伙人':35000,'独立设计大师':50000
-  };
-  const t = (gameState && gameState.title && gameState.title.title) || '见习设计师';
-  return titles[t] || 4000;
-}
-
-function getCurrentAge() {
-  return gameState?.player_age ?? 24;
-}
-
-function formatEffectText(effects) {
-  if (!effects || !effects.length) return '';
-  if (typeof effects === 'string') return effects;
-  return effects.map(e => e.text || '').filter(Boolean).join(' ');
-}
-
-function formatEffectSummary(effects) {
-  if (!effects || !effects.length) return null;
-  if (typeof effects === 'string') return {positive:[], negative:[]};
-  const pos = effects.filter(e => e.delta > 0).map(e => ({name: e.attr, delta: e.delta}));
-  const neg = effects.filter(e => e.delta < 0 && e.attr !== 'stamina' && e.attr !== 'savings').map(e => ({name: e.attr, delta: e.delta}));
-  return {positive:pos, negative:neg};
-}
+function getCurrentAge() { return gameState?.player_age ?? 24; }
 
 // ========== Notifications ==========
 function showNotification(type, message) {
@@ -211,7 +177,6 @@ function showNotification(type, message) {
   banner.className = 'notif notif-' + type;
   banner.innerHTML = `<span class="notif-icon">${icons[type]||'📢'}</span><span class="notif-text">${message}</span>`;
   document.body.appendChild(banner);
-
   const gap = 6;
   const existing = document.querySelectorAll('.notif');
   if (window.innerWidth <= 860) {
@@ -228,15 +193,13 @@ function showNotification(type, message) {
     setTimeout(() => { banner.remove(); restackNotifs(); }, 300);
   }, 2500);
 }
-
 function restackNotifs() {
   const remaining = document.querySelectorAll('.notif');
   const gap = 6;
   if (window.innerWidth <= 860) {
     let bottomOffset = 80;
     remaining.forEach(n => {
-      n.style.bottom = bottomOffset + 'px';
-      n.style.top = 'auto';
+      n.style.bottom = bottomOffset + 'px'; n.style.top = 'auto';
       n.style.transition = 'bottom 0.2s ease';
       bottomOffset += (n.offsetHeight||40)+gap;
     });
@@ -248,7 +211,7 @@ function restackNotifs() {
   }
 }
 
-// ========== Process action/active_action response ==========
+// ========== Process action response ==========
 function processActionResponse(d) {
   updateGameState(d);
   if (d.new_achievements && d.new_achievements.length > 0) {
@@ -272,10 +235,7 @@ function processActionResponse(d) {
   if (d.challenge) showNotification('milestone', '🔥 ' + d.challenge.name + '：' + d.challenge.message);
   if (d.project_phase_hint) showNotification('milestone', '📋 项目进入「' + d.project_phase_hint + '」阶段');
   if (d.result) showNotification('npc', '⚡ ' + d.result);
-  if (d.ending) {
-    // Store ending for next render cycle
-    window._pendingEnding = d.ending;
-  }
+  if (d.ending) { window._pendingEnding = d.ending; }
   _prevTitle = (d.title && d.title.title) || _prevTitle;
 }
 
@@ -289,3 +249,417 @@ async function fetchAchievements() {
   } catch(e) { _achievementsCache = []; }
   return _achievementsCache;
 }
+
+// ============================================================
+// SCREEN MANAGEMENT
+// ============================================================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  currentScreen = id;
+}
+
+// ============================================================
+// CREATE CHARACTER FLOW
+// ============================================================
+function startCreate() {
+  selections = {origin:'',resources:'',goal:'',pace:''};
+  currentPlayer = {name:'林知夏',age:'24',city:'上海',custom_origin:'',specialization:''};
+  createStep = 0;
+  showScreen('create');
+  renderCreateStep();
+}
+
+function selectOpt(type, id) { selections[type] = id; renderCreateStep(); }
+
+function nextStep() {
+  if (createStep === 0) {
+    currentPlayer.name = document.getElementById('c-name')?.value || currentPlayer.name;
+    currentPlayer.age = document.getElementById('c-age')?.value || currentPlayer.age;
+    currentPlayer.city = document.getElementById('c-city')?.value || currentPlayer.city;
+  }
+  if (createStep === 1) {
+    const ci = document.getElementById('custom-origin');
+    if (ci) currentPlayer.custom_origin = ci.value;
+  }
+  if (createStep === 5) {
+    currentPlayer.specialization = selections.specialization || '';
+  }
+  createStep++;
+  if (createStep > 5) { createStep = 5; }
+  renderCreateStep();
+}
+
+function prevStep() {
+  createStep = Math.max(0, createStep - 1);
+  renderCreateStep();
+}
+
+function renderCreateStep() {
+  const container = document.getElementById('create-container');
+  if (!container) return;
+  let html = `<div class="create-progress">${STEP_LABELS.map((l,i) =>
+    `<span class="cp-step${i===createStep?' active':''}${i<createStep?' done':''}">${i+1}. ${l}</span>`
+  ).join('')}</div>`;
+
+  if (createStep === 0) {
+    html += `<div class="create-step active">
+      <div class="field"><label>姓名</label><input id="c-name" value="${esc(currentPlayer.name)}" maxlength="8"></div>
+      <div class="field"><label>年龄</label><input id="c-age" value="${esc(currentPlayer.age)}" type="number" min="18" max="60"></div>
+      <div class="field"><label>城市</label><input id="c-city" value="${esc(currentPlayer.city)}"></div>
+      <div class="create-nav"><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 1) {
+    html += `<div class="create-step active">`;
+    ORIGINS.forEach(o => {
+      html += `<div class="select-card${selections.origin===o.id?' selected':''}" onclick="selectOpt('origin','${o.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${o.id}. ${o.title}</div><div class="sc-desc">${o.desc}</div>
+        <div class="sc-tags">${o.good?`<span class="sc-tag-good">✦ ${o.good}</span>`:''}${o.warn?`<span class="sc-tag-warn">△ ${o.warn}</span>`:''}</div></div></div>`;
+    });
+    html += `<div class="field" style="margin-top:8px"><label>自定义描述（仅选G需填）</label><input id="custom-origin" placeholder="描述你的职业"></div>`;
+    html += `<div class="create-nav"><button class="btn btn-back" onclick="prevStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 2) {
+    html += `<div class="create-step active">`;
+    RESOURCES.forEach(r => {
+      html += `<div class="select-card${selections.resources===r.id?' selected':''}" onclick="selectOpt('resources','${r.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${r.id}. ${r.title}</div><div class="sc-desc">${r.desc}</div></div></div>`;
+    });
+    html += `<div class="create-nav"><button class="btn btn-back" onclick="prevStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 3) {
+    html += `<div class="create-step active">`;
+    GOALS.forEach(g => {
+      html += `<div class="select-card${selections.goal===g.id?' selected':''}" onclick="selectOpt('goal','${g.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${g.id}. ${g.title}</div><div class="sc-desc">${g.desc}</div></div></div>`;
+    });
+    html += `<div class="create-nav"><button class="btn btn-back" onclick="prevStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 4) {
+    html += `<div class="create-step active">`;
+    PACES.forEach(p => {
+      html += `<div class="select-card${selections.pace===p.id?' selected':''}" onclick="selectOpt('pace','${p.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${p.id}. ${p.title}</div><div class="sc-desc">${p.desc}</div></div></div>`;
+    });
+    html += `<div class="create-nav"><button class="btn btn-back" onclick="prevStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>`;
+  } else if (createStep === 5) {
+    html += `<div class="create-step active">`;
+    SPECIALIZATIONS.forEach(s => {
+      html += `<div class="select-card${selections.specialization===s.id?' selected':''}" onclick="selectOpt('specialization','${s.id}')">
+        <div class="sc-radio"></div><div class="sc-body"><div class="sc-title">${s.icon} ${s.name}</div><div class="sc-desc">${s.desc}</div><div class="sc-tags"><span class="sc-tag-good">✦ ${s.attr}</span></div></div></div>`;
+    });
+    html += `<div class="create-nav"><button class="btn btn-back" onclick="prevStep()">← 上一步</button><button class="btn btn-primary" onclick="startGame()">🎮 开始游戏</button></div></div>`;
+  }
+  container.innerHTML = html;
+}
+
+// ============================================================
+// GAME START / LOAD / RESET
+// ============================================================
+async function startGame() {
+  if (createStep === 1) { const ci = document.getElementById('custom-origin'); if (ci) currentPlayer.custom_origin = ci.value; }
+  showScreen('game');
+  renderLoading(true);
+  isProcessing = true;
+  try {
+    const d = await API.newGame({...currentPlayer, ...selections});
+    gameState = d.state;
+    _prevTitle = d.state?.title?.title || '';
+    isProcessing = false;
+    renderAll();
+  } catch (e) {
+    renderLoading(false, esc(e.message));
+    isProcessing = false;
+  }
+}
+
+async function loadGame() {
+  try {
+    const d = await API.getState();
+    if (!d.state) { alert('没有存档'); return; }
+    gameState = d.state;
+    _prevTitle = d.state?.title?.title || '';
+    showScreen('game');
+    renderAll();
+  } catch (e) { alert('连接失败'); }
+}
+
+async function resetGame() {
+  if (!confirm('确定结束当前游戏？存档将被删除。')) return;
+  try { await API.reset(); } catch(e) {}
+  gameState = null;
+  showScreen('cover');
+}
+
+// ============================================================
+// DEFAULT renderLoading (can be overridden by each HTML)
+// ============================================================
+function renderLoading(on, msg) {
+  // Override in each HTML file for custom loading UI
+  if (on) console.log('Loading...');
+  else if (msg) console.log('Error:', msg);
+}
+
+// ============================================================
+// GAME ACTIONS
+// ============================================================
+async function makeChoice(choiceId) {
+  if (isProcessing) return;
+  if (gameState && gameState.stamina <= 0) return;
+  isProcessing = true;
+  renderLoading(true);
+  try {
+    const d = await API.doAction(choiceId);
+    processActionResponse(d);
+    isProcessing = false;
+    renderAll();
+  } catch (e) {
+    renderLoading(false, esc(e.message));
+    isProcessing = false;
+  }
+}
+
+async function doActiveAction(actionKey) {
+  if (isProcessing) return;
+  isProcessing = true;
+  renderLoading(true);
+  try {
+    const d = await API.activeAction(actionKey);
+    processActionResponse(d);
+    isProcessing = false;
+    renderAll();
+  } catch (e) {
+    renderLoading(false, esc(e.message));
+    isProcessing = false;
+  }
+}
+
+// ============================================================
+// ACTIVE ACTIONS SUBMENU
+// ============================================================
+function toggleAA() {
+  const s = document.getElementById('aa-sub');
+  if (s) s.style.display = s.style.display === 'block' ? 'none' : 'block';
+}
+
+function buildActiveActionButtons() {
+  if (!gameState) return '';
+  const st = gameState;
+  return ACTIVE_ACTIONS_LIST.filter(a => !a.disabled || !a.disabled(st)).map(a => {
+    const d = a.disabled ? a.disabled(st) : false;
+    return `<button class="aa-btn" ${d?'disabled':''} onclick="event.stopPropagation();${d?'':'doActiveAction(\''+a.key+'\')'}">${a.name}<span class="aa-desc">${a.desc}</span></button>`;
+  }).join('');
+}
+
+// ============================================================
+// NPC INTERACTIONS
+// ============================================================
+async function showNPCSheet(npcId) {
+  if (isProcessing) return;
+  try {
+    const d = await API.getNPCs(npcId);
+    if (d.error) { alert(d.error); return; }
+    let html = `<div class="npc-sheet-header">
+      <div class="npc-sheet-avatar" style="background:${AVATAR_COLORS[Math.abs(hashCode(npcId))%6]}">${d.name?.[0]||'?'}</div>
+      <div><h3>${esc(d.name)}</h3><div style="color:var(--text-secondary);font-size:0.78rem">${esc(d.relation||'')}</div></div>
+    </div>`;
+    if (d.options && d.options.length) {
+      html += '<div style="margin-top:12px">';
+      d.options.forEach(o => {
+        html += `<button class="npc-option-btn" onclick="doNPC('${npcId}','${o.id}')">
+          <div>${esc(o.text)}</div><div style="font-size:0.68rem;color:var(--text-secondary)">${esc(o.hint||'')}</div></button>`;
+      });
+      html += '</div>';
+    }
+    openModal(html);
+  } catch(e) { alert('NPC 加载失败'); }
+}
+
+async function doNPC(npcId, actionId) {
+  closeModal();
+  try {
+    const d = await API.doNPC(npcId, actionId);
+    if (d.result) showNotification('npc', d.result);
+    if (d.npc_event) showNotification('npc', `${d.npc_event.npc_name}：${d.npc_event.text}`);
+    if (d.stamina !== undefined) gameState.stamina = d.stamina;
+    if (d.savings !== undefined) gameState.savings = d.savings;
+    if (d.attributes) gameState.attributes = d.attributes;
+    renderAll();
+  } catch (e) { alert('互动失败'); }
+}
+
+function hashCode(s) { let h=0; for(let i=0;i<(s||'').length;i++) h=(h<<5)-h+s.charCodeAt(i)|0; return h; }
+
+// ============================================================
+// MODAL
+// ============================================================
+function openModal(html) {
+  const m = document.getElementById('modal');
+  if (!m) return;
+  m.innerHTML = `<div class="modal-card">${html}</div>`;
+  m.classList.add('active');
+}
+function closeModal() {
+  const m = document.getElementById('modal');
+  if (m) m.classList.remove('active');
+}
+
+// ============================================================
+// FEEDBACK
+// ============================================================
+async function showFeedback() {
+  let html = '<h3 style="font-family:var(--font-serif);margin-bottom:12px">💬 反馈</h3>';
+  html += '<div style="font-size:0.78rem;color:var(--text-secondary);margin-bottom:12px">有什么想法、建议或 bug？告诉我们</div>';
+  html += '<textarea id="fb-text" style="width:100%;height:80px;padding:10px;border:1px solid var(--surface-3);border-radius:var(--radius);font-size:0.82rem;font-family:var(--font-sans);resize:vertical" placeholder="请输入反馈..."></textarea>';
+  html += '<button class="btn btn-primary" style="margin-top:10px;width:100%" onclick="submitFeedback()">发送反馈</button>';
+  openModal(html);
+}
+
+async function submitFeedback() {
+  const el = document.getElementById('fb-text');
+  if (!el || !el.value.trim()) return;
+  try {
+    await API.sendFeedback(el.value, gameState?.turn_count || 0, gameState?.player?.name || '');
+    closeModal();
+    showNotification('milestone', '感谢反馈！');
+  } catch(e) { alert('发送失败'); }
+}
+
+// ============================================================
+// ENDINGS
+// ============================================================
+function showEnding(ending) {
+  let html = `<div class="ending-panel"><h2 style="font-family:var(--font-serif)">${esc(ending.name)}</h2>
+    <p style="white-space:pre-wrap">${esc(ending.description)}</p>`;
+  if (ending.options && ending.options.length) {
+    ending.options.forEach(o => {
+      html += `<button class="btn btn-primary" style="margin:6px;width:100%" onclick="resolveEnding('${o.id}')">${esc(o.text)}</button>`;
+    });
+  }
+  html += '</div>';
+  openModal(html);
+}
+
+async function resolveEnding() { closeModal(); }
+
+// ============================================================
+// SAVES
+// ============================================================
+async function showSaves() {
+  let html = '<h3 style="font-family:var(--font-serif);margin-bottom:12px">💾 存档管理</h3>';
+  try {
+    const d = await API.getSaves();
+    const saves = d.saved || [];
+    for (let i = 1; i <= 5; i++) {
+      const s = saves.find(x => x.slot === i);
+      const info = s ? `${s.title || ''} · 回合${s.turn||0} · ${s.date||''}` : '空槽位';
+      html += `<div class="save-row">
+        <span style="font-size:0.78rem;color:var(--text-secondary)">槽 ${i}: ${esc(info)}</span>
+        <div>${s ? `<button class="btn btn-sm" onclick="doLoad(${i})">读取</button><button class="btn btn-sm" style="color:var(--danger)" onclick="doDelete(${i})">删除</button>` : ''}
+        <button class="btn btn-sm" onclick="doSave(${i})">保存</button></div></div>`;
+    }
+    html += `<div style="margin-top:12px"><button class="btn btn-primary" style="width:100%" onclick="API.export()">📤 导出存档</button></div>`;
+    html += `<button class="btn" style="width:100%;margin-top:6px" onclick="importSave()">📥 导入存档</button>`;
+  } catch(e) { html += '<div style="color:var(--danger)">加载失败</div>'; }
+  openModal(html);
+}
+
+async function doSave(s) {
+  try { await API.saveSlot(s); showNotification('milestone', '已保存'); showSaves(); } catch(e) { alert('保存失败'); }
+}
+
+async function doLoad(s) {
+  if (!confirm(`确定读取槽位${s}？`)) return;
+  try {
+    const d = await API.loadSlot(s);
+    gameState = d.state;
+    _prevTitle = d.state?.title?.title || '';
+    closeModal();
+    renderAll();
+    showNotification('milestone', '已读取');
+  } catch(e) { alert('读取失败'); }
+}
+
+async function doDelete(s) {
+  if (!confirm(`确定删除槽位${s}？`)) return;
+  try { await API.deleteSlot(s); showSaves(); } catch(e) { alert('删除失败'); }
+}
+
+async function importSave() {
+  const i = document.createElement('input');
+  i.type = 'file'; i.accept = '.json';
+  i.onchange = async e => {
+    const f = e.target.files[0];
+    if (!f) return;
+    try {
+      const s = JSON.parse(await f.text());
+      if (!s.player || !s.attributes) { alert('格式无效'); return; }
+      await API.importState(s);
+      gameState = s;
+      _prevTitle = s?.title?.title || '';
+      closeModal();
+      renderAll();
+      showNotification('milestone', '导入成功');
+    } catch(err) { alert('导入失败: ' + err.message); }
+  };
+  i.click();
+}
+
+// ============================================================
+// INDUSTRY NEWS
+// ============================================================
+let _newsCache = null;
+async function renderIndustryNews() {
+  const el = document.getElementById('tb-trend');
+  if (!el) return;
+  try {
+    if (!_newsCache) { const d = await API.getIndustryNews(); _newsCache = d.news || []; }
+    if (_newsCache.length) {
+      const n = _newsCache[Math.floor(Math.random() * _newsCache.length)];
+      el.textContent = `📐 ${n}`;
+      el.style.display = '';
+    }
+  } catch(e) {}
+}
+
+// ============================================================
+// PORTFOLIO & ACHIEVEMENTS (cached render helpers)
+// ============================================================
+function renderCachedPortfolio(entries) {
+  if (!entries || !entries.length) return '<div style="color:var(--text-secondary);font-size:0.8rem;text-align:center;padding:20px">暂无作品记录<br>完成项目后自动生成</div>';
+  return entries.map(e => `<div class="folio-card">
+    <div class="folio-title">${esc(e.name)}</div>
+    <div class="folio-meta">${esc(e.time||'')} · ${esc(e.client||'')} · ¥${(e.budget||0).toLocaleString()}</div>
+    <div class="folio-summary">${esc(e.summary||'')}</div>
+  </div>`).join('');
+}
+
+function renderCachedAchievements(allAch, unlocked) {
+  const uset = new Set(unlocked || []);
+  return allAch.map(a => `<div class="ach-card${uset.has(a.id)?' unlocked':''}">
+    <div class="ach-icon">${a.icon||'🏅'}</div>
+    <div class="ach-name">${esc(a.name)}</div>
+    <div class="ach-desc">${esc(a.desc)}</div>
+  </div>`).join('');
+}
+
+async function loadPortfolio() {
+  try { return (await API.genPortfolio()).entries || []; } catch(e) { return []; }
+}
+
+async function loadAchievements() {
+  try { return (await fetchAchievements()) || []; } catch(e) { return []; }
+}
+
+// ============================================================
+// INIT — global click delegation
+// ============================================================
+document.addEventListener('click', function(e) {
+  const btn = e.target.closest('.choice-btn');
+  if (btn && !btn.disabled && !isProcessing) {
+    if (gameState && gameState.stamina <= 0 && btn.dataset.choice !== '__action__') return;
+    const choiceId = btn.getAttribute('data-choice');
+    if (choiceId) makeChoice(choiceId);
+  }
+  // Close AA submenu on outside click
+  const aaSub = document.getElementById('aa-sub');
+  if (aaSub && aaSub.style.display === 'block' && !e.target.closest('#aa-sub') && !e.target.closest('.choice-btn-auto')) {
+    aaSub.style.display = 'none';
+  }
+});
