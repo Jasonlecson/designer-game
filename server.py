@@ -488,47 +488,6 @@ def apply_npc_updates(npcs, npc_updates):
                 name_map[name]['desc'] = update['desc']
     return npcs
 
-def apply_choice_effects(state, choice_effect):
-    '''Parse effect string like '审美+1 执行-2 精力-10' and apply to state.'''
-    ATTR_MAP = {
-        '审美': '审美判断力', '执行': '执行能力', '商业': '商业思维',
-        '表达': '表达能力', '创意': '创意深度', '作品': '作品集厚度'
-    }
-    if not choice_effect or not isinstance(choice_effect, str):
-        return {}
-    applied = {}
-    parts = choice_effect.strip().split()
-    for part in parts:
-        # Handle attribute changes
-        for short, full in ATTR_MAP.items():
-            if part.startswith(short):
-                try:
-                    delta_str = part.replace(short, '').replace(' ', '')
-                    delta = int(delta_str)
-                    current = state['attributes'].get(full, 5)
-                    state['attributes'][full] = max(1, min(ATTR_CAP, current + delta))
-                    applied[full] = delta
-                except (ValueError, KeyError):
-                    pass
-                break
-        # Handle stamina change
-        if part.startswith('精力'):
-            try:
-                delta = int(part.replace('精力', ''))
-                state['stamina'] = max(0, min(100, state.get('stamina', 80) + delta))
-                applied['__stamina__'] = delta
-            except ValueError:
-                pass
-        # Handle savings change
-        if part.startswith('储蓄'):
-            try:
-                delta = int(part.replace('储蓄', ''))
-                state['savings'] = max(0, state.get('savings', 3000) + delta)
-                applied['__savings__'] = delta
-            except ValueError:
-                pass
-    return applied
-
 def apply_company_update(state, company_update):
     '''Apply company/job changes from LLM output.'''
     if not company_update or not isinstance(company_update, dict):
@@ -848,7 +807,7 @@ def check_milestone(state):
             if tpl['check'](state):
                 ms['completed'] = True
                 reward = ms.get('reward', '')
-                apply_choice_effects(state, reward)
+                apply_effect_xp(state, reward)
                 return True, reward
 
     # Check if expired
@@ -1076,8 +1035,11 @@ def check_career_challenge(state):
             for attr, delta in ch.get('effect', {}).items():
                 if attr == '精力值':
                     state['stamina'] = max(0, state.get('stamina', 80) + delta)
-                elif attr in state.get('attributes', {}):
-                    state['attributes'][attr] = max(1, min(ATTR_CAP, state['attributes'][attr] + delta))
+                else:
+                    xp = state.get('attribute_xp', {})
+                    xp[attr] = xp.get(attr, 0) + 50 * delta
+                    state['attribute_xp'] = xp
+            state['attributes'] = xp_to_attrs(state)
             return ch
     return None
 
@@ -2331,7 +2293,10 @@ def api_active_action():
             action_attr = min(non_portfolio, key=non_portfolio.get) if non_portfolio else '审美判断力'
         if action_attr in state.get('attributes', {}):
             boost = 1 if action_key == 'train' else 2
-            state['attributes'][action_attr] = min(ATTR_CAP, state['attributes'][action_attr] + boost)
+            xp = state.get('attribute_xp', {})
+            xp[action_attr] = xp.get(action_attr, 0) + 50 * boost
+            state['attribute_xp'] = xp
+            state['attributes'] = xp_to_attrs(state)
             verb = '报班学习' if action_key == 'train' else '参加封闭集训，高强度学习'
             action_context = f'主动行动：{verb}{action_attr}，属性提升+{boost}。'
             result_msg = f'{action_attr} +{boost}'
@@ -2344,9 +2309,12 @@ def api_active_action():
         action_context = f'主动行动：请了一周假，深度休息，精力恢复+35。但项目进度可能受到了一些影响。'
         result_msg = '精力 +35'
     elif action_key == 'portfolio':
-        state['attributes']['作品集厚度'] = min(ATTR_CAP, state['attributes'].get('作品集厚度', 1) + 1)
-        action_context = f'主动行动：花了大量时间整理和打磨作品集，作品集厚度+1。这段时间你的设计产出减少了，但作品质量在提升。'
-        result_msg = '作品集厚度 +1'
+        xp = state.get('attribute_xp', {})
+        xp['作品集厚度'] = xp.get('作品集厚度', 0) + 200
+        state['attribute_xp'] = xp
+        state['attributes'] = xp_to_attrs(state)
+        action_context = f'主动行动：花了大量时间整理和打磨作品集。这段时间你的设计产出减少了，但作品质量在提升。'
+        result_msg = '作品集厚度提升'
     elif action_key == 'jobhunt_targeted':
         import random as _random
         companies = _random.sample(['云帆科技','墨白文化','星辰互娱','知味餐饮','森屿集团','青禾品牌'], 3)
