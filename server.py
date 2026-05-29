@@ -2506,7 +2506,18 @@ def api_active_action():
         'event_tag': result.get('event_tag', '日常'),
     }
     state['story_log'].append(entry)
-    state['attributes'] = result.get('attr_display', state['attributes'])
+    # Apply trends + XP + cooldown (same as api_action)
+    apply_trend_to_xp(state, result.get('attr_trend', {}))
+    apply_focus_bonus(state)
+    focus = state.get('_focus')
+    if focus:
+        focus['turns_left'] = max(0, focus.get('turns_left', 0) - 1)
+        if focus['turns_left'] <= 0: state.pop('_focus', None)
+    state['attributes'] = xp_to_attrs(state)
+    # Decrement project cooldown
+    cd = state.get('_project_cooldown', 0)
+    if cd > 0:
+        state['_project_cooldown'] = cd - 1
 
     # Run all post-turn systems (same as api_action)
     arc_msg = detect_and_start_arc(state)
