@@ -1804,6 +1804,16 @@ def api_new_game():
 
 @app.route('/api/action', methods=['POST'])
 def api_action():
+    try:
+        return _api_action_impl()
+    except Exception as e:
+        import traceback
+        with open('_debug_crash.txt', 'w', encoding='utf-8') as f:
+            f.write(f'{type(e).__name__}: {e}\n\n')
+            f.write(traceback.format_exc())
+        return jsonify({'error': f'服务器异常: {str(e)[:100]}'}), 500
+
+def _api_action_impl():
     data = request.get_json(silent=True) or {}
     state = load_state()
     if not state:
