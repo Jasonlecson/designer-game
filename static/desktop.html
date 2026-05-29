@@ -808,7 +808,7 @@ function renderNetwork(tc) {
   tc.innerHTML = html;
 }
 
-function renderPortfolio(tc) {
+async function renderPortfolio(tc) {
   var p = gameState.player || {};
   var c = gameState.company || {};
   var html = '<div class="portfolio-content">';
