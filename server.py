@@ -8,6 +8,19 @@ from flask import Flask, request, jsonify, send_from_directory, session
 
 app = Flask(__name__, static_folder='static', static_url_path='')
 app.secret_key = os.environ.get('SECRET_KEY', 'designer-game-fixed-key-2024')
+app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
+
+# ============================================================
+# Global crash logger — catches ALL unhandled exceptions
+# ============================================================
+@app.errorhandler(Exception)
+def handle_crash(e):
+    import traceback as tb
+    with open('_crash.log', 'a', encoding='utf-8') as f:
+        f.write(f'\n[{datetime.now().isoformat()}] {type(e).__name__}: {e}\n')
+        f.write(tb.format_exc())
+        f.write('\n' + '='*60 + '\n')
+    return jsonify({'error': f'服务器异常: {str(e)[:100]}'}), 500
 
 BASE_DIR = os.path.dirname(__file__)
 CONFIG_FILE = os.path.join(BASE_DIR, 'config.json')
