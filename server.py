@@ -917,8 +917,10 @@ def advance_project_phase(state):
         xp['商业思维'] = xp.get('商业思维', 0) + 200
         state['attribute_xp'] = xp
         state['attributes'] = xp_to_attrs(state)
-        # Record to portfolio
+        # Record to portfolio + cooldown
         add_portfolio_entry(state, proj)
+        state['_project_cooldown'] = random.randint(4, 8)
+        state.pop('current_project', None)
 
     if phases_progressed:
         state['_project_phase_changed'] = proj.get('phase', '')
@@ -1576,6 +1578,10 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
         parts.append(f'\n# 当前项目: {cp.get("name","无")} ({cp.get("phase","进行中")})')
         if cp.get('budget'):
             parts.append(f'  预算: {cp["budget"]}元 | 质量: {cp.get("quality",0)}/100 | 客户满意度: {cp.get("client_satisfaction",50)}/100')
+    elif state.get('_project_cooldown', 0) > 0:
+        parts.append(f'\n# 项目间歇期，{state["_project_cooldown"]}周后可以接新项目')
+    else:
+        parts.append('\n# 项目间歇期，可以接新项目了')
 
     # S1: Milestone
     ms = state.get('milestone')
@@ -2006,6 +2012,11 @@ def api_action():
     state['savings'] = max(0, state.get('savings', 3000) + result.get('savings_change', 0))
     state['turn_count'] = turn
 
+    # Decrement project cooldown
+    cd = state.get('_project_cooldown', 0)
+    if cd > 0:
+        state['_project_cooldown'] = cd - 1
+
     # Title & achievements
     prev_stamina = state.get('_prev_stamina', state.get('stamina', 80))
     state['title'] = calculate_title(state['attributes'])
@@ -2316,6 +2327,12 @@ def api_project():
         return jsonify({'error': '没有存档'}), 404
     proj = state.get('current_project')
     if not proj:
+        # Check cooldown after previous project completion
+        cooldown = state.get('_project_cooldown', 0)
+        if cooldown > 0:
+            proj_info = {'phase': '休息', 'name': '项目间歇', 'cooldown': cooldown}
+            return jsonify({'project': proj_info, 'attrs': state.get('attributes', {}),
+                'savings': state.get('savings', 0), 'stamina': state.get('stamina', 80)})
         # Auto-generate a project if none exists
         import random as _random
         spec = state.get('specialization', {})
