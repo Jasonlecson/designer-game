@@ -1450,11 +1450,11 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
     npcs = state.get('npcs', [])
     story_len = len(state.get('story_log', []))
 
+    # Phase 1: Fixed prefix (all cacheable — never changes across turns)
     parts = [
         '# 状态',
-        f'{player.get("name","?")} {int(player.get("age","0") or 0) + state.get("turn_count", 0) // 48}岁 {player.get("city","上海")} | {get_game_date(state)}',
-        f'{player.get("origin","?")} → {player.get("goal","?")} | {state.get("title",{}).get("title","见习")} | 第{story_len+1}回合',
-        f'资源:{player.get("resources","?")} 节奏:{player.get("pace","标准")} | 精力:{state.get("stamina",80)} 储蓄:{state.get("savings",3000)}',
+        f'{player.get("name","?")} | {player.get("city","上海")} | {player.get("origin","?")} → {player.get("goal","?")}',
+        f'资源:{player.get("resources","?")} 节奏:{player.get("pace","标准")}',
     ]
     # Goal hint
     goal = player.get('goal', '')
@@ -1468,6 +1468,13 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
     if goal in goal_hints:
         parts.append(f'倾向: {goal_hints[goal]}')
     parts.append(f'公司: {state.get("company",{}).get("name","待定")} | {state.get("company",{}).get("position","设计师")}')
+    # Trait (FIXED per origin — cacheable)
+    trait = state.get('trait', {})
+    if trait:
+        parts.append(f'特质: {trait.get("name","")}—{trait.get("desc","")[:40]}')
+    # Phase 2: Variable content (cache break starts here)
+    parts.append(f'{int(player.get("age","0") or 0) + state.get("turn_count", 0) // 48}岁 | {get_game_date(state)} | {state.get("title",{}).get("title","见习")} | 第{story_len+1}回合')
+    parts.append(f'精力:{state.get("stamina",80)} 储蓄:{state.get("savings",3000)}')
     # Attributes (compact)
     attr_parts = []
     for k, v in attrs.items():
@@ -1501,12 +1508,9 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
     ms = state.get('milestone')
     if ms:
         parts.append(f'阶段目标: {ms.get("description","")} 截止{ms.get("deadline_turn",0)}回 进度{ms.get("progress",0)}%')
-    # Stamina + trait
+    # Stamina + trait ctx
     status, _ = get_stamina_status(state.get('stamina', 80))
     parts.append(f'精力: {status}({state.get("stamina",80)})')
-    trait = state.get('trait', {})
-    if trait:
-        parts.append(f'特质: {trait.get("name","")}—{trait.get("desc","")[:40]}')
     trait_ctx = get_trait_context(state)
     if trait_ctx:
         parts.append(f'特质倾向: {trait_ctx}')
