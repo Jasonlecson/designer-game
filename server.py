@@ -92,6 +92,7 @@ def save_state(state):
 
 # Per-player thread lock — prevents concurrent write conflicts
 _player_locks = {}
+_pending_focus = {}         # {session_id: focus_dict} — in-memory focus, merged on next save
 _npc_interacted = {}       # {session_id: {npc_id: True}} — per-turn NPC interaction tracking (NOT persisted)
 _npc_event_log = {}        # {session_id: [(npc_name, action_text)]} — recent NPC interactions for LLM context
 _npc_spotlight = {}        # {session_id: {npc_name: remaining_turns}} — elevated visibility window after interaction
@@ -1620,16 +1621,14 @@ def index():
 
 @app.route('/api/focus', methods=['POST'])
 def api_set_focus():
-    state = load_state()
-    if not state:
-        return jsonify({'error': '没有存档'}), 404
     data = request.get_json(silent=True) or {}
     focus_type = data.get('type', '')
     if focus_type not in FOCUS_ATTRS:
         return jsonify({'error': '无效的重心类型'}), 400
-    state['_focus'] = {'type': focus_type, 'turns_left': 5}
-    save_state(state)
-    return jsonify({'ok': True, 'focus': state['_focus']})
+    # In-memory only — avoids race with api_action
+    pid = get_session_id()
+    _pending_focus[pid] = {'type': focus_type, 'turns_left': 5}
+    return jsonify({'ok': True, 'focus': _pending_focus[pid]})
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def api_config():
@@ -2006,6 +2005,10 @@ def _api_action_impl():
 
     lock = get_player_lock()
     with lock:
+        # Merge pending focus (set while LLM was running)
+        pid = get_session_id()
+        if pid in _pending_focus:
+            state['_focus'] = _pending_focus.pop(pid)
         state['_trend'] = trend
         state['_industry_news'] = get_cached_news(state)
         state['_npc_pending'] = _npc_pending_events.get(get_session_id(), {})
