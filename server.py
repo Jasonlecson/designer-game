@@ -313,6 +313,10 @@ def call_llm(messages, api_base, api_key, model):
             resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
         if resp.status_code != 200:
             return None, f'API错误 {resp.status_code}: {resp.text[:200]}'
+        # Guard against HTML error pages returned as 200
+        raw = resp.text.strip()
+        if raw.startswith('<!') or raw.startswith('<html'):
+            return None, f'API返回HTML而非JSON: {raw[:200]}'
         data = resp.json()
         content = data['choices'][0]['message']['content'].strip()
         # Clean markdown code blocks
