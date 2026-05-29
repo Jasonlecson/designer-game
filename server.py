@@ -1450,42 +1450,29 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
     story_len = len(state.get('story_log', []))
 
     parts = [
-        '# 游戏状态',
-        f'当前日期: {get_game_date(state)}',
-        f'女主: {player.get("name","?")}, {int(player.get("age","0") or 0) + state.get("turn_count", 0) // 48}岁, {player.get("city","上海")}',
-        f'职业: {player.get("origin","?")} → 目标: {player.get("goal","?")}',
-        f'当前头衔: {state.get("title",{}).get("title","见习设计师")}（{state.get("title",{}).get("stage","萌芽期")}）',
-        f'资源: {player.get("resources","?")}, 节奏: {player.get("pace","标准")}',
-        f'当前回合: 第{story_len+1}回合',
+        '# 状态',
+        f'{player.get("name","?")} {int(player.get("age","0") or 0) + state.get("turn_count", 0) // 48}岁 {player.get("city","上海")} | {get_game_date(state)}',
+        f'{player.get("origin","?")} → {player.get("goal","?")} | {state.get("title",{}).get("title","见习")} | 第{story_len+1}回合',
+        f'精力:{state.get("stamina",80)} 储蓄:{state.get("savings",3000)}元',
     ]
-    # Goal-specific guidance for LLM
+    # Goal hint
     goal = player.get('goal', '')
     goal_hints = {
-        '成为顶级独立设计师': '倾向独立创作、高端私单、设计竞赛的事件。',
-        '做到创意总监/合伙人': '倾向晋升、团队管理、商业谈判的事件。',
-        '创立自己的设计品牌/厂牌': '倾向创业、品牌建设、融资的事件。',
-        '成为行业话语权拥有者': '倾向论坛曝光、媒体、行业影响力的事件。',
-        '活着就好': '倾向稳定收入、轻松节奏、人际关系的事件。',
+        '成为顶级独立设计师': '独立创作/私单/竞赛',
+        '做到创意总监/合伙人': '晋升/管理/谈判',
+        '创立自己的设计品牌/厂牌': '创业/品牌/融资',
+        '成为行业话语权拥有者': '论坛/媒体/行业影响力',
+        '活着就好': '稳定收入/轻松节奏',
     }
     if goal in goal_hints:
-        parts.append('')
-        parts.append(f'# 长期目标引导: {goal_hints[goal]}')
-    parts.append('')
-    parts.append(f'# 当前公司: {state.get("company",{}).get("name","待定")} | 职位: {state.get("company",{}).get("position","设计师")}')
-    parts.append('')
-    parts.append('# 资源')
-    parts.append(f'  精力值: {state.get("stamina",80)}/100')
-    parts.append(f'  储蓄: {state.get("savings",3000)}元')
-    parts.append('')
-    parts.append('# 属性')
+        parts.append(f'倾向: {goal_hints[goal]}')
+    parts.append(f'公司: {state.get("company",{}).get("name","待定")} | {state.get("company",{}).get("position","设计师")}')
+    # Attributes (compact)
+    attr_parts = []
     for k, v in attrs.items():
-        bar_len = max(1, min(20, v))
-        bar = '\u2587' * bar_len + '\u2581' * max(0, 20 - bar_len)
-        parts.append(f'  {k}: {bar} ({v}/20)')
-
-    parts.append('')
-
-    # Time dimension — real calendar
+        attr_parts.append(f'{k}:{v}')
+    parts.append(f'属性: {", ".join(attr_parts)}')
+    # Time + season
     game_date = get_game_date(state)
     season, events = get_season_and_events(game_date)
     try:
@@ -1493,60 +1480,46 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
     except:
         month_num = datetime.now().month
     season_hint = get_season_llm_hint(month_num)
-    parts.append(f'# 时间: {game_date}（{season}）')
-    parts.append(f'# 季节事件倾向: {season_hint["tag"]} — {season_hint["hint"]}')
-    parts.append(f'  当前季节特征: {", ".join(events[:2])}')
-
-    parts.append('# NPC（含当前关系）')
+    parts.append(f'时间: {game_date} {season} | {season_hint["tag"]} {season_hint["hint"][:30]}')
+    # NPCs (compact)
+    npc_parts = []
     for n in npcs[:6]:
-        parts.append(f'  {n["name"]} - {n["role"]} | 关系: {n.get("relation","待展开")} | {n.get("desc","")}')
+        rel = n.get('relation','')
+        rel_short = rel if rel != '待剧情展开' else ''
+        npc_parts.append(f'{n["name"]}({n["role"]}{":"+rel_short if rel_short else ""})')
+    parts.append(f'NPC: {", ".join(npc_parts)}')
 
     if state.get('current_project'):
         cp = state['current_project']
-        parts.append(f'\n# 当前项目: {cp.get("name","无")} ({cp.get("phase","进行中")})')
-        if cp.get('budget'):
-            parts.append(f'  预算: {cp["budget"]}元 | 质量: {cp.get("quality",0)}/100 | 客户满意度: {cp.get("client_satisfaction",50)}/100')
+        parts.append(f'项目: {cp.get("name","无")} ({cp.get("phase","")}) 预算{cp.get("budget",0)} 质量{cp.get("quality",0)} 满意{cp.get("client_satisfaction",50)}')
     elif state.get('_project_cooldown', 0) > 0:
-        parts.append(f'\n# 项目间歇期，{state["_project_cooldown"]}周后可以接新项目')
+        parts.append(f'项目间歇, {state["_project_cooldown"]}周后可接')
     else:
-        parts.append('\n# 项目间歇期，可以接新项目了')
-
-    # S1: Milestone
+        parts.append('项目间歇, 可接新项目')
+    # Milestone
     ms = state.get('milestone')
     if ms:
-        parts.append(f'\n# 当前阶段目标: {ms.get("description","")}（第{ms.get("deadline_turn",0)}回合截止，进度{ms.get("progress",0)}%）')
-
-    # S2: Stamina status
+        parts.append(f'阶段目标: {ms.get("description","")} 截止{ms.get("deadline_turn",0)}回 进度{ms.get("progress",0)}%')
+    # Stamina + trait
     status, _ = get_stamina_status(state.get('stamina', 80))
-    parts.append(f'\n# 精力状态: {status}（{state.get("stamina",80)}/100）')
-
-    # I3: Trait
+    parts.append(f'精力: {status}({state.get("stamina",80)})')
     trait = state.get('trait', {})
     if trait:
-        parts.append(f'\n# 职业特质: {trait.get("name","")} — {trait.get("desc","")}')
-    trait_ctx = get_trait_context(state)
-    if trait_ctx:
-        parts.append(f'# 特质倾向: {trait_ctx}')
-
-    # 4: Narrative arc
+        parts.append(f'特质: {trait.get("name","")}—{trait.get("desc","")[:40]}')
+    # Arc
     arc = state.get('_narrative_arc')
     if arc:
         phases = arc.get('phases', [])
         idx = arc.get('phase_idx', 0)
         phase_name = phases[idx] if idx < len(phases) else '完结'
-        parts.append(f'\n# 当前叙事弧: 「{arc.get("name","")}」第{idx+1}阶段：{phase_name}')
-
-    # Savings crisis
+        parts.append(f'叙事弧: {arc.get("name","")} {phase_name}')
+    # Crisis
     if state.get('_savings_crisis_level', 0) > 0:
-        parts.append(f'\n# ⚠️ 财务危机等级: {state.get("_savings_crisis_level")}/3')
-
-    parts.append('\n# 最近回合')
-    for e in state.get('story_log', [])[-5:]:
-        parts.append(f'  [{e.get("event_tag","")}] 玩家: {e.get("player_action","")}')
-        if e.get('narrative'):
-            parts.append(f'  → {e["narrative"][:120]}...')
-
-    parts.append('\n---')
+        parts.append(f'财务危机 Lv{state.get("_savings_crisis_level")}')
+    # Recent turns (3 instead of 5)
+    parts.append('最近:')
+    for e in state.get('story_log', [])[-3:]:
+        parts.append(f'  [{e.get("event_tag","")}] {e.get("player_action","")[:20]}')
     msg = '\n'.join(parts)
 
     messages = [
@@ -1893,18 +1866,17 @@ def api_action():
             check_text += f'  叙事方向: {cr["message"]}\n'
         messages.append({'role': 'user', 'content': check_text})
 
-    # I5-A / 8: Inject spec event & year review into LLM context
+    # I5-A / 8: Inject spec event & year review
     if spec_event:
-        messages.append({'role': 'user', 'content': f'【专精事件】{spec_event}\n请在叙事中自然地融入此专精相关事件。'})
+        messages.append({'role': 'user', 'content': f'【专精事件】{spec_event} 请融入叙事。'})
     if year_review:
         messages.append({'role': 'user', 'content': year_review})
-
-    # 9: Inject focus into messages
+    # 9: Focus
     focus = state.get('_focus')
     if focus:
         fc = FOCUS_ATTRS.get(focus.get('type', ''))
         if fc:
-            messages.append({'role': 'user', 'content': f'【近期重心】{fc["hint"]}，剩余{focus.get("turns_left",0)}周。请让叙事和选项倾向这个方向。'})
+            messages.append({'role': 'user', 'content': f'【重心】{fc["hint"]}，剩{focus.get("turns_left",0)}周。'})
 
     result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
 
