@@ -379,6 +379,7 @@ def validate_and_fix_result(result, turn_count, attrs):
             # Keep ch['effect'] for frontend display
         if 'effects' not in ch or not isinstance(ch['effects'], list):
             ch['effects'] = []
+    if not result.get('atmosphere'):
         result['atmosphere'] = '设计工作室的日常'
     if not result.get('event_tag'):
         result['event_tag'] = '日常'
