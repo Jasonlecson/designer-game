@@ -40,7 +40,14 @@ const API = {
   saveSlot(slot)   { return this.fetch('/api/saves/save', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({slot}) }); },
   loadSlot(slot)   { return this.fetch('/api/saves/load', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({slot}) }); },
   deleteSlot(slot) { return this.fetch('/api/saves/delete', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({slot}) }); },
+  setFocus(type)  { return this.fetch('/api/focus', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({type}) }); },
 };
+const FOCUS_OPTIONS = [
+  {type:'skill', icon:'🎨', label:'修炼技能', hint:'审美·执行·创意 +XP'},
+  {type:'network', icon:'🤝', label:'拓展人脉', hint:'表达 +XP'},
+  {type:'project', icon:'📋', label:'完成项目', hint:'执行·作品 +XP'},
+  {type:'finance', icon:'💰', label:'攒钱理财', hint:'商业 +XP'},
+];
 
 // ========== Constants ==========
 const ATTR_NAMES = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度'];
@@ -447,6 +454,27 @@ function buildActiveActionButtons() {
     const d = a.disabled ? a.disabled(st) : false;
     return `<button class="aa-btn" ${d?'disabled':''} onclick="event.stopPropagation();${d?'':'doActiveAction(\''+a.key+'\')'}">${a.name}<span class="aa-desc">${a.desc}</span></button>`;
   }).join('');
+}
+
+// ========== Focus System ==========
+function buildFocusButtons() {
+  if (!gameState) return '';
+  const cur = (gameState._focus || {});
+  const current = cur.type || '';
+  const left = cur.turns_left || 0;
+  let html = '<div style="font-size:0.72rem;color:var(--text-secondary);margin-bottom:4px">🎯 近期重心 ' + (current ? `(${left}周)` : '') + '</div>';
+  FOCUS_OPTIONS.forEach(f => {
+    const sel = current === f.type ? 'style="border-color:var(--accent);background:var(--accent-bg)"' : '';
+    html += `<button class="focus-btn" ${sel} onclick="setGameFocus('${f.type}')">${f.icon} ${f.label}</button>`;
+  });
+  return html;
+}
+
+async function setGameFocus(type) {
+  try {
+    const d = await API.setFocus(type);
+    if (d.ok) { gameState._focus = d.focus; showNotification('milestone', '重心已设定'); renderAll(); }
+  } catch(e) { alert('设定失败'); }
 }
 
 // ============================================================

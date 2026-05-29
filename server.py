@@ -920,6 +920,8 @@ def advance_project_phase(state):
         # Record to portfolio
         add_portfolio_entry(state, proj)
 
+    if phases_progressed:
+        state['_project_phase_changed'] = proj.get('phase', '')
     return phase_hints.get(proj.get('phase', ''), '') if phases_progressed else None
 
 def add_portfolio_entry(state, proj):
@@ -1158,6 +1160,93 @@ SPEC_PROJECTS = {
     'motion':       ['品牌宣传片', '产品动效演示', '社交媒体短视频', '开场动画'],
     'print':        ['年度画册', '空间导视系统', '书籍装帧', '展览物料'],
 }
+
+# ============================================================
+# I5-A: Specialization Events — 专精随机事件 (每12-15回合)
+# ============================================================
+SPEC_EVENTS = {
+    'brand': [
+        '收到品牌设计行业大会的邀请函',
+        '一个知名消费品牌正在寻找新的视觉合作伙伴',
+        '你的品牌提案被同行转发到设计论坛引起讨论',
+        '参加了品牌策略workshop，对商业设计的结合有了新理解',
+    ],
+    'ui_ux': [
+        '收到了Figma社区年度活动的邀请',
+        '一个风口上的互联网产品在寻找UI设计师',
+        '你在设计论坛发的交互原型被官方推荐了',
+        '面试时被问到AI是否会替代UI设计，这让你思考了很久',
+    ],
+    'illustration': [
+        '一个独立出版品牌想和你合作一本绘本',
+        '你的插画作品被某品牌看到想购买授权',
+        '参加插画师社群线下活动认识了不少志同道合的人',
+        '收到一个游戏项目的美术外包邀约',
+    ],
+    'motion': [
+        '一个音乐人想为他的新专辑找你做视觉设计',
+        '某广告公司外包了一个品牌宣传片的动效制作',
+        '参加了Motion Design大会看到行业前沿视觉表达',
+        '一个展会主办方找你做开幕动画',
+    ],
+    'print': [
+        '独立书店想让你为年度书目做装帧设计',
+        '某个展览的空间导视系统项目向你发出邀请',
+        '在印刷厂认识了新的材料供应商可以做特殊工艺',
+        '受邀参加一个书籍设计的学术研讨会',
+    ],
+}
+
+def check_spec_event(state):
+    '''Trigger specialization event every 12-15 turns.'''
+    turn = state.get('turn_count', 0)
+    last = state.get('_last_spec_event', 0)
+    spec = state.get('specialization')
+    if not spec or turn - last < random.randint(12, 15):
+        return None
+    events = SPEC_EVENTS.get(spec.get('id', ''), [])
+    if not events: return None
+    state['_last_spec_event'] = turn
+    return random.choice(events)
+
+# ============================================================
+# 8. Year-in-Review — 年度回顾 (每48回合)
+# ============================================================
+def check_year_review(state):
+    '''Trigger year review at turn 48, 96, 144...'''
+    turn = state.get('turn_count', 0)
+    if turn <= 0 or turn % 48 != 0:
+        return None
+    log = state.get('story_log', [])
+    projects = [e for e in log if e.get('event_tag') == '项目推进']
+    turning = [e for e in log if e.get('event_tag') == '转折点']
+    title = state.get('title', {}).get('title', '设计师')
+    savings = state.get('savings', 0)
+    age = state.get('player', {}).get('age', 24) + turn // 48
+    return (
+        f'【年度回顾】{age}岁·{title}·完成{len(projects)}个项目·{len(turning)}个转折·储蓄{savings}元。'
+        f'请生成150-200字的年终回顾叙事，审视这一年的成长与得失。'
+    )
+
+# ============================================================
+# 9. Focus System — 近期重心
+# ============================================================
+FOCUS_ATTRS = {
+    'skill':     {'attrs': ['审美判断力','执行能力','创意深度'], 'hint': '专注提升设计技能'},
+    'network':   {'attrs': ['表达能力'], 'hint': '专注拓展人脉和社交'},
+    'project':   {'attrs': ['执行能力','作品集厚度'], 'hint': '专注完成项目和积累作品'},
+    'finance':   {'attrs': ['商业思维'], 'hint': '专注收入和财务稳定'},
+}
+
+def apply_focus_bonus(state):
+    focus = state.get('_focus')
+    if not focus: return
+    fc = FOCUS_ATTRS.get(focus.get('type', ''))
+    if not fc: return
+    xp = state.get('attribute_xp', {})
+    for attr in fc['attrs']:
+        xp[attr] = xp.get(attr, 0) + 5
+    state['attribute_xp'] = xp
 
 # ============================================================
 # I6: Design Trends System — 设计趋势迭代
@@ -1558,6 +1647,13 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
         opening_prompt += '每个回合代表约1周。只输出纯JSON，不要```json标记，不要任何额外文字。'
         messages.append({'role': 'user', 'content': opening_prompt})
 
+    # 10: Project decision prompt
+    phase_changed = state.pop('_project_phase_changed', '')
+    if phase_changed:
+        proj = state.get('current_project', {})
+        parts.append(f'\n# 项目阶段变更: {phase_changed} — {proj.get("name","")}')
+        parts.append('请在本回合选项中包含一个与项目推进相关的决策（如：选择设计风格、如何回应甲方反馈、是否加班赶工等）。')
+
     return messages
 
 # ============================================================
@@ -1582,6 +1678,19 @@ def index():
     if is_mobile_device():
         return send_from_directory('static', 'mobile.html')
     return send_from_directory('static', 'desktop.html')
+
+@app.route('/api/focus', methods=['POST'])
+def api_set_focus():
+    state = load_state()
+    if not state:
+        return jsonify({'error': '没有存档'}), 404
+    data = request.get_json(silent=True) or {}
+    focus_type = data.get('type', '')
+    if focus_type not in FOCUS_ATTRS:
+        return jsonify({'error': '无效的重心类型'}), 400
+    state['_focus'] = {'type': focus_type, 'turns_left': 5}
+    save_state(state)
+    return jsonify({'ok': True, 'focus': state['_focus']})
 
 @app.route('/api/config', methods=['GET', 'POST'])
 def api_config():
@@ -1723,6 +1832,11 @@ def api_new_game():
         apply_company_update(state, result['company_update'])
     # XP: apply trends, derive attributes
     apply_trend_to_xp(state, result.get('attr_trend', {}))
+    apply_focus_bonus(state)
+    focus = state.get('_focus')
+    if focus:
+        focus['turns_left'] = max(0, focus.get('turns_left', 0) - 1)
+        if focus['turns_left'] <= 0: state.pop('_focus', None)
     state['attributes'] = xp_to_attrs(state)
 
     state['story_log'].append({
@@ -1845,6 +1959,19 @@ def api_action():
             check_text += f'  叙事方向: {cr["message"]}\n'
         messages.append({'role': 'user', 'content': check_text})
 
+    # I5-A / 8: Inject spec event & year review into LLM context
+    if spec_event:
+        messages.append({'role': 'user', 'content': f'【专精事件】{spec_event}\n请在叙事中自然地融入此专精相关事件。'})
+    if year_review:
+        messages.append({'role': 'user', 'content': year_review})
+
+    # 9: Inject focus into messages
+    focus = state.get('_focus')
+    if focus:
+        fc = FOCUS_ATTRS.get(focus.get('type', ''))
+        if fc:
+            messages.append({'role': 'user', 'content': f'【近期重心】{fc["hint"]}，剩余{focus.get("turns_left",0)}周。请让叙事和选项倾向这个方向。'})
+
     result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
 
     if error:
@@ -1859,6 +1986,11 @@ def api_action():
     turn = state['turn_count'] + 1
     # XP: apply LLM trends, derive attributes
     apply_trend_to_xp(state, result.get('attr_trend', {}))
+    apply_focus_bonus(state)
+    focus = state.get('_focus')
+    if focus:
+        focus['turns_left'] = max(0, focus.get('turns_left', 0) - 1)
+        if focus['turns_left'] <= 0: state.pop('_focus', None)
     state['attributes'] = xp_to_attrs(state)
     entry = {
         'turn': turn,
@@ -1886,6 +2018,12 @@ def api_action():
 
     # 6: Career stage challenges
     challenge = check_career_challenge(state)
+
+    # I5-A: Specialization event
+    spec_event = check_spec_event(state)
+
+    # 8: Year review
+    year_review = check_year_review(state)
 
     # S3: Process weekly economy
     economy_event = process_economy(state)

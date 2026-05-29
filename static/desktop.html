@@ -366,6 +366,10 @@ body{
       <div class="side-label">属性</div>
       <div class="attr-list" id="sb-attrs"></div>
     </div>
+    <div class="side-section">
+      <div class="side-label">近期重心</div>
+      <div id="sb-focus"></div>
+    </div>
     <div class="side-section side-ms-section" id="sb-ms-section">
       <div class="side-label">阶段目标</div>
       <div id="sb-milestone"></div>
@@ -687,6 +691,9 @@ function renderAll() {
     window._pendingEnding = null;
   }
   renderIndustryNews();
+
+  var focusEl = document.getElementById('sb-focus');
+  if (focusEl) focusEl.innerHTML = buildFocusButtons();
 
   var al = document.getElementById('sb-attrs');
   var xp = gameState.attribute_xp || {};
