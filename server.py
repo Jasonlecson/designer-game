@@ -78,8 +78,11 @@ def get_state_file():
 def load_state():
     path = get_state_file()
     if os.path.exists(path):
-        with open(path, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                return json.load(f)
+        except (json.JSONDecodeError, IOError):
+            return None
     return None
 
 def save_state(state):

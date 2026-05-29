@@ -820,14 +820,8 @@ function renderPortfolio(tc) {
   html += '<div class="ach-grid" id="ach-grid"><div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--text-tertiary);font-size:0.75rem">加载中...</div></div>';
 
   tc.innerHTML = html;
-  loadPortfolio();
-  loadAchievements();
-}
-
-async function loadPortfolio() {
   try {
-    var d = await API.genPortfolio();
-    var entries = d.entries || [];
+    var entries = (await API.genPortfolio()).entries || [];
     var grid = document.getElementById('pt-grid');
     if (!grid) return;
     var colors = ['var(--accent)', 'var(--success)', '#7b8fa1', '#c4a43e', '#8e6b9e', '#c4755e'];
@@ -836,22 +830,20 @@ async function loadPortfolio() {
       : entries.map(function(e, i) {
         return '<div class="pt-card"><div class="pt-card-visual" style="background:linear-gradient(135deg,' + colors[i % 6] + '22,' + colors[(i + 1) % 6] + '11)">🖼️</div><div class="pt-card-name">' + esc(e.name || '') + '</div><div class="pt-card-time" style="font-size:0.6rem;color:var(--text-tertiary)">' + esc(e.time || '') + ' · ' + esc(e.client || '') + ' · ' + (e.budget || 0) / 1000 + 'k</div><div style="font-size:0.6rem;color:var(--accent)">质量 ' + (e.quality || 0) + '/100</div><div class="pt-card-highlight">' + esc((e.summary || '').substring(0, 60)) + '</div></div>';
       }).join('');
-  } catch(e) {}
-}
-
-async function loadAchievements() {
-  try {
+    // Achievements
     var all = await fetchAchievements();
-    var grid = document.getElementById('ach-grid');
-    if (!grid) return;
-    var unlocked = new Set(gameState.unlocked_achievements || []);
-    grid.innerHTML = all.map(function(a) {
-      return '<div class="ach-item ' + (unlocked.has(a.id) ? 'unlocked' : 'locked') + '"><span>' + a.icon + '</span> <b>' + a.name + '</b><div style="font-size:0.62rem;color:var(--text-secondary)">' + (unlocked.has(a.id) ? '已解锁' : '未解锁') + ' · ' + a.desc + '</div></div>';
-    }).join('');
-  } catch(e) {}
+    var achGrid = document.getElementById('ach-grid');
+    if (achGrid) {
+      var unlocked = new Set(gameState.unlocked_achievements || []);
+      achGrid.innerHTML = all.map(function(a) {
+        return '<div class="ach-item ' + (unlocked.has(a.id) ? 'unlocked' : 'locked') + '"><span>' + a.icon + '</span> <b>' + a.name + '</b><div style="font-size:0.62rem;color:var(--text-secondary)">' + (unlocked.has(a.id) ? '已解锁' : '未解锁') + ' · ' + a.desc + '</div></div>';
+      }).join('');
+    }
+  } catch(e) {
+    var g = document.getElementById('pt-grid');
+    if (g) g.innerHTML = '<div style="grid-column:1/-1;text-align:center;padding:12px;color:var(--danger);font-size:0.75rem">加载失败: ' + esc(e.message || '') + '</div>';
+  }
 }
-
-// ============================================================
 // SIDEBAR RESIZER
 // ============================================================
 (function() {
