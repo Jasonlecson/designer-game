@@ -2091,9 +2091,8 @@ def api_npc_interact():
         return jsonify({'error': '精力不足'}), 400
     state['stamina'] = max(0, min(100, stamina - cost))
 
-    # Apply effects via XP system
-    effect = action['effect']
-    apply_effect_xp(state, effect)
+    # NPC interactions influence narrative, not direct stat changes
+    # The LLM will incorporate the interaction outcome into future attr_trend
 
     # Update NPC relation
     if npc.get('relation') == '待剧情展开':
@@ -2122,10 +2121,10 @@ def api_npc_interact():
         save_state(state)
     return jsonify({
         'ok': True,
-        'result': f'与{npc["name"]}互动：{effect or action["text"]}',
+        'result': f'与{npc["name"]}互动：{action["text"]}',
         'npc_name': npc['name'],
         'action_text': action['text'],
-        'effect': effect,
+        'effect': action.get('effect', ''),
         'stamina': state['stamina'],
         'savings': state.get('savings', 0),
         'attributes': state['attributes'],
