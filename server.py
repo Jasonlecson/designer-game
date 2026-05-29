@@ -445,11 +445,10 @@ def validate_and_fix_result(result, turn_count, attrs):
     # Normalize all choices to effects[] format (convert legacy 'effect' strings)
     for ch in result.get('choices', []):
         if 'effect' in ch and isinstance(ch['effect'], str) and ch['effect'].strip():
-            # Legacy string found, convert and remove
             converted = _legacy_effect_to_structured(ch['effect'])
             if converted:
                 ch['effects'] = converted
-            ch.pop('effect', None)
+            # Keep ch['effect'] for frontend display
         if 'effects' not in ch or not isinstance(ch['effects'], list):
             ch['effects'] = []
         result['atmosphere'] = '设计工作室的日常'
@@ -618,12 +617,45 @@ def xp_to_attrs(state):
         attrs[attr] = xp_to_level(xp_dict.get(attr, 0))
     return attrs
 
-def apply_effect_xp(state, effects_list):
-    '''Apply choice effects — always uses structured format.
-    Format: [{"attr": "审美判断力", "delta": 1, "text": "..."}, ...]
+def apply_effect_xp(state, choice_effect):
+    '''Apply choice effect — supports both string format and structured list.
+    String: "审美+1 精力-8" / Structured: [{"attr":"审美","delta":1},...]
     Returns {attr: level_change} for notification.'''
     level_changes = {}
-    if not effects_list or not isinstance(effects_list, list):
+
+    # Parse string format into structured list
+    if isinstance(choice_effect, str) and choice_effect.strip():
+        SHORT_MAP = {
+            '审美': '审美判断力', '执行': '执行能力', '商业': '商业思维',
+            '表达': '表达能力', '创意': '创意深度', '作品': '作品集厚度'
+        }
+        effects_list = []
+        parts = choice_effect.strip().split()
+        for part in parts:
+            for short, full in SHORT_MAP.items():
+                if part.startswith(short):
+                    try:
+                        delta = int(part[len(short):])
+                        effects_list.append({'attr': full, 'delta': delta, 'text': part})
+                    except (ValueError, IndexError):
+                        pass
+                    break
+            # Handle stamina/savings in string format
+            if part.startswith('精力'):
+                try:
+                    delta = int(part[2:])
+                    effects_list.append({'attr': 'stamina', 'delta': delta})
+                except (ValueError, IndexError):
+                    pass
+            elif part.startswith('储蓄'):
+                try:
+                    delta = int(part[2:])
+                    effects_list.append({'attr': 'savings', 'delta': delta})
+                except (ValueError, IndexError):
+                    pass
+    elif isinstance(choice_effect, list):
+        effects_list = choice_effect
+    else:
         return level_changes
 
     XP_PER_EFFECT_POINT = 50
@@ -641,7 +673,6 @@ def apply_effect_xp(state, effects_list):
         elif attr == 'savings':
             state['savings'] = max(0, state.get('savings', 3000) + delta)
         else:
-            # Core attribute
             xp_delta = XP_PER_EFFECT_POINT * delta
             old_level = xp_to_level(xp.get(attr, 0))
             xp[attr] = xp.get(attr, 0) + xp_delta
