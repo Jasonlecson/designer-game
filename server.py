@@ -1453,7 +1453,7 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
         '# 状态',
         f'{player.get("name","?")} {int(player.get("age","0") or 0) + state.get("turn_count", 0) // 48}岁 {player.get("city","上海")} | {get_game_date(state)}',
         f'{player.get("origin","?")} → {player.get("goal","?")} | {state.get("title",{}).get("title","见习")} | 第{story_len+1}回合',
-        f'精力:{state.get("stamina",80)} 储蓄:{state.get("savings",3000)}元',
+        f'资源:{player.get("resources","?")} 节奏:{player.get("pace","标准")} | 精力:{state.get("stamina",80)} 储蓄:{state.get("savings",3000)}',
     ]
     # Goal hint
     goal = player.get('goal', '')
