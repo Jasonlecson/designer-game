@@ -219,7 +219,7 @@ delta=1表示加25XP，delta=2表示加50XP。涨属性必须伴随代价。
 ## 规则速查
 - stamina_change: -15~+20, 须与所选choice effects中stamina的delta一致
 - attr_trend: 每个属性 up/down/flat，后端转XP
-- company_update: 仅重大变动时更新，否则省略
+- company_update: 仅重大变动时更新(tier可选:small_studio/mid_agency/big_firm/top_tier), 否则省略
 - npc_updates: 可选，仅涉及NPC时更新
 - choices: 必须2-3个，每个标注risk(safe/medium/high)，无终点游戏属性低不代表结束
 - 每周1回合，季节影响事件倾向'''
@@ -417,6 +417,17 @@ def apply_company_update(state, company_update):
         'action': action,
         'turn': state.get('turn_count', 0)
     }
+    # Auto-derive company tier from name/position context
+    name_lower = new_company['name'].lower()
+    pos_lower = new_company['position'].lower()
+    if any(w in name_lower for w in ['国际','global','4a','顶级','top']):
+        new_company['tier'] = 'top_tier'
+    elif any(w in name_lower for w in ['大厂','集团','上市','奥美','阳狮']):
+        new_company['tier'] = 'big_firm'
+    elif any(w in name_lower for w in ['工作室','studio','小','初创','独立']) or '实习' in pos_lower:
+        new_company['tier'] = 'small_studio'
+    else:
+        new_company['tier'] = company_update.get('tier', 'mid_agency')
 
     # Record history
     history = state.get('career_history', [])
@@ -1024,6 +1035,10 @@ def process_economy(state):
     # No salary if unemployed (no company set)
     if not company.get('name'):
         salary = 0
+    else:
+        TIER_MULTIPLIER = {'small_studio': 0.7, 'mid_agency': 1.0, 'big_firm': 1.3, 'top_tier': 1.6}
+        tier = company.get('tier', 'mid_agency')
+        salary = int(salary * TIER_MULTIPLIER.get(tier, 1.0))
 
     state['savings'] += salary
 
