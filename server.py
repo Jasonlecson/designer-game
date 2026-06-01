@@ -1797,6 +1797,7 @@ def _api_action_impl():
     # Collect NPC events from last turn for LLM context
     npc_context = flush_npc_event_log()
     chosen_effect = ''
+    chosen_choice = None
     if choice_id and not action_text:
         last_entry = state['story_log'][-1] if state['story_log'] else None
         if last_entry and last_entry.get('choices'):
@@ -1804,6 +1805,7 @@ def _api_action_impl():
                 if ch['id'] == choice_id:
                     action_text = ch['text']
                     chosen_effect = ch.get('effects', [])
+                    chosen_choice = ch
                     break
     if not action_text:
         action_text = '玩家做出了选择'
@@ -1971,7 +1973,7 @@ def _api_action_impl():
 
     # 4: Memory — track recent choice tendency
     choice_history = state.get('_choice_history', [])
-    choice_history.append({'turn': state['turn_count'], 'text': action_text[:30], 'risk': chosen.get('risk', 'medium') if isinstance(chosen, dict) else 'medium'})
+    choice_history.append({'turn': state['turn_count'], 'text': action_text[:30], 'risk': chosen_choice.get('risk', 'medium') if isinstance(chosen_choice, dict) else 'medium'})
     if len(choice_history) > 5: choice_history = choice_history[-5:]
     state['_choice_history'] = choice_history
 
