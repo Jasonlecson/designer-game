@@ -524,10 +524,10 @@ function renderLoading(on, msg) {
 // Override renderCreateStep for mobile create wizard layout
 function renderCreateStep() {
   var el = document.getElementById('create');
-  var labels = ['基本信息', '出身选择', '开局资源', '职业目标', '节奏偏好'];
-  var titles = ['你的身份', '你从何处来', '你拥有什么', '你要去向哪里', '你的节奏'];
+  var labels = ['基本信息', '出身选择', '开局资源', '职业目标', '节奏偏好', '专精方向'];
+  var titles = ['你的身份', '你从何处来', '你拥有什么', '你要去向哪里', '你的节奏', '你的方向'];
   var html = '<div class="create-card">';
-  html += '<div class="create-step-label">STEP ' + (createStep + 1) + '/5 · ' + labels[createStep] + '</div>';
+  html += '<div class="create-step-label">STEP ' + (createStep + 1) + '/6 · ' + labels[createStep] + '</div>';
   html += '<div class="create-step-title">' + titles[createStep] + '</div>';
   html += '<div class="create-progress">';
   for (var i = 0; i < 6; i++) {
@@ -562,13 +562,20 @@ function renderCreateStep() {
       html += '<div class="select-card' + sel + '" data-opt-type="goal" data-opt-id="' + g.id + '" onclick="selectOpt(\'goal\',\'' + g.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + g.id + '. ' + g.title + '</div><div class="sc-desc">' + g.desc + '</div></div></div>';
     });
     html += '<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=2;renderCreateStep()">←</button><button class="btn btn-primary" onclick="nextStep()">下一步</button></div>';
-  } else {
-    // Step 4 — Pace (mobile has 5 steps, step 4 is pace, startGame directly)
+  } else if (createStep === 4) {
+    // Step 4 — Pace
     PACES.forEach(function(p) {
       var sel = selections.pace === p.id ? ' selected' : '';
       html += '<div class="select-card' + sel + '" data-opt-type="pace" data-opt-id="' + p.id + '" onclick="selectOpt(\'pace\',\'' + p.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + p.id + '. ' + p.title + '</div><div class="sc-desc">' + p.desc + '</div></div></div>';
     });
-    html += '<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=3;renderCreateStep()">←</button><button class="btn btn-primary" onclick="startGame()">✦ 开始</button></div>';
+    html += '<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=3;renderCreateStep()">←</button><button class="btn btn-primary" onclick="nextStep()">下一步</button></div>';
+  } else {
+    // Step 5 — Specialization
+    SPECIALIZATIONS.forEach(function(s) {
+      var sel = selections.specialization === s.id ? ' selected' : '';
+      html += '<div class="select-card' + sel + '" data-opt-type="specialization" data-opt-id="' + s.id + '" onclick="selectOpt(\'specialization\',\'' + s.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + s.icon + ' ' + s.name + '</div><div class="sc-desc">' + s.desc + ' · ' + s.attr + '+2</div></div></div>';
+    });
+    html += '<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=4;renderCreateStep()">←</button><button class="btn btn-primary" onclick="startGame()">✦ 开始</button></div>';
   }
 
   el.innerHTML = html;
@@ -593,6 +600,9 @@ function nextStep() {
   if (createStep === 1) {
     var ci = document.getElementById('custom-origin');
     if (ci) currentPlayer.custom_origin = ci.value;
+  }
+  if (createStep === 5) {
+    currentPlayer.specialization = selections.specialization || '';
   }
   createStep++;
   renderCreateStep();
@@ -856,6 +866,8 @@ function renderStatsTab() {
   });
   html += '</div>';
   html += '<div class="stat-resources"><div class="stat-res-item"><div class="stat-res-val" style="color:var(--accent)">' + (gameState.stamina ?? 80) + '</div><div class="stat-res-label">精力</div></div><div class="stat-res-item"><div class="stat-res-val" style="color:var(--success)">' + (gameState.savings ?? 3000) + '</div><div class="stat-res-label">储蓄 (元)</div></div><div class="stat-res-item"><div class="stat-res-val">' + (gameState.turn_count ?? 0) + '</div><div class="stat-res-label">回合</div></div></div>';
+
+  html += '<div style="margin-top:16px">' + buildFocusButtons() + '</div>';
 
   if (ms && !ms.completed) {
     var deadline = ms.deadline_turn || 0;

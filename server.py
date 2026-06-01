@@ -315,18 +315,6 @@ def call_llm(messages, api_base, api_key, model):
             'response_format': {'type': 'json_object'}
         }
         resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
-        # Diagnostic: log ALL responses (append, not overwrite)
-        from datetime import datetime as _dt
-        ts = _dt.now().strftime('%H%M%S%f')
-        try:
-            with open(f'_debug_{ts}_prompt.txt', 'w', encoding='utf-8') as f:
-                f.write(f'Status: {resp.status_code}\n')
-                for i, m in enumerate(messages):
-                    f.write(f'=== M{i} {m["role"]} {len(m["content"])}c ===\n{m["content"]}\n\n')
-            with open(f'_debug_{ts}_resp.txt', 'w', encoding='utf-8') as f:
-                f.write(f'Status: {resp.status_code}\n')
-                f.write(resp.text[:2000])
-        except: pass
         if resp.status_code != 200:
             payload.pop('response_format', None)
             resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120)
@@ -654,7 +642,7 @@ ACHIEVEMENTS = [
     {'id': 'npc_3_related',  'name': '社交达人', 'desc': '与 3 位 NPC 建立关系', 'icon': '💬'},
     {'id': 'turn_20',        'name': '十年磨一剑', 'desc': '职业生涯超过 20 回合', 'icon': '⏳'},
     {'id': 'turn_50',        'name': '老设计师',   'desc': '职业生涯超过 50 回合', 'icon': '📜'},
-    {'id': 'all_rounder',    'name': '六边形战士', 'desc': '全属性 ≥ 8', 'icon': '⭐'},
+    {'id': 'all_rounder',    'name': '六边形战士', 'desc': '5项核心属性 ≥ 10', 'icon': '⭐'},
 ]
 
 # ============================================================
@@ -987,19 +975,6 @@ def detect_and_start_arc(state):
                 }
                 return f'叙事弧开始：「{arc["name"]}」第1阶段：{arc["phases"][0]}'
     return None
-
-# ============================================================
-# 5. Enhanced Active Actions — 主动行动策略化
-# ============================================================
-ENHANCED_ACTIONS = {
-    'rest_short': {'name': '周末休整', 'cost': {}, 'effect': '精力+15', 'icon': '☕', 'desc': '休息两天，恢复精力'},
-    'rest_long': {'name': '请假休假', 'cost': {'savings': -1000}, 'effect': '精力+35', 'icon': '🏖️', 'desc': '请假一周，深度恢复，但可能错过项目节点'},
-    'train': {'name': '报班学习', 'cost': {'savings': -3000}, 'effect': '自选属性+1（持续3回合缓升）', 'icon': '📚'},
-    'train_intensive': {'name': '封闭集训', 'cost': {'savings': -8000, 'stamina': -20}, 'effect': '自选属性+2（一次性）', 'icon': '🎓'},
-    'jobhunt_targeted': {'name': '精准投递', 'cost': {'stamina': -15}, 'effect': '投3家公司，不同回复概率', 'icon': '🎯'},
-    'portfolio': {'name': '整理作品集', 'cost': {'stamina': -5}, 'effect': '作品集+200XP', 'icon': '🎨'},
-    'networking': {'name': '社交拓展', 'cost': {'savings': -1500, 'stamina': -8}, 'effect': '随机触发NPC接触事件', 'icon': '🤝'},
-}
 
 # ============================================================
 # 6. Career Stage Challenges — 职业阶段挑战
@@ -1497,7 +1472,7 @@ def check_achievements(state, prev_stamina=None):
     if turn >= 50: unlock('turn_50')
 
     # All-rounder
-    all_attrs = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']
+    all_attrs = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度']
     if all(attrs.get(k, 0) >= 10 for k in all_attrs): unlock('all_rounder')
 
     # First project — check if any log entry has event_tag '项目推进'
@@ -1843,10 +1818,9 @@ def api_action():
     try:
         return _api_action_impl()
     except Exception as e:
-        import traceback
-        with open('_debug_crash.txt', 'w', encoding='utf-8') as f:
-            f.write(f'{type(e).__name__}: {e}\n\n')
-            f.write(traceback.format_exc())
+        import traceback, sys
+        print(f'[CRASH] {type(e).__name__}: {e}', file=sys.stderr)
+        traceback.print_exc(file=sys.stderr)
         return jsonify({'error': f'服务器异常: {str(e)[:100]}'}), 500
 
 def _api_action_impl():
@@ -2419,12 +2393,12 @@ def api_active_action():
         if action_attr in state.get('attributes', {}):
             boost = 1 if action_key == 'train' else 2
             xp = state.get('attribute_xp', {})
-            xp[action_attr] = xp.get(action_attr, 0) + 50 * boost
+            xp[action_attr] = xp.get(action_attr, 0) + 25 * boost
             state['attribute_xp'] = xp
             state['attributes'] = xp_to_attrs(state)
             verb = '报班学习' if action_key == 'train' else '参加封闭集训，高强度学习'
-            action_context = f'主动行动：{verb}{action_attr}，属性提升+{boost}。'
-            result_msg = f'{action_attr} +{boost}'
+            action_context = f'主动行动：{verb}{action_attr}。'
+            result_msg = f'{action_attr} +{25 * boost}XP'
     elif action_key == 'rest_short':
         state['stamina'] = min(100, state.get('stamina', 80) + 15)
         action_context = f'主动行动：周末休整，精力恢复+15。这个月节奏比较舒缓。'
