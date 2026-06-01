@@ -1188,10 +1188,19 @@ DESIGN_TRENDS = [
 TREND_CYCLE_TURNS = 48  # ~12 months per trend cycle
 _current_trend_index = {}  # {session_id: index}
 
-def get_current_trend(state, seed_override=None):
-    '''Get current design trend. Changes every 48 turns.'''
-    idx = (state.get('turn_count', 0) // TREND_CYCLE_TURNS) % len(DESIGN_TRENDS)
-    return DESIGN_TRENDS[idx]
+def get_current_trend(state):
+    '''Get current design trend. LLM generates every 48 turns, cached in state.'''
+    turn = state.get('turn_count', 0)
+    cached = state.get('_trend')
+    if cached and turn < cached.get('_until', 0):
+        return cached
+    return None  # Need to ask LLM for a new trend
+
+def trend_needs_update(state):
+    '''Check if current trend needs LLM regeneration.'''
+    turn = state.get('turn_count', 0)
+    cached = state.get('_trend')
+    return not cached or turn >= cached.get('_until', 0)
 
 def apply_trend_to_economy(state, base_amount):
     '''Adjust project budget based on trend alignment.'''
@@ -1904,6 +1913,11 @@ def _api_action_impl():
         if fc:
             messages.append({'role': 'user', 'content': f'【重心】{fc["hint"]}，剩{focus.get("turns_left",0)}周。'})
 
+    # I6: Design trend — ask LLM to refresh every 48 turns
+    if trend_needs_update(state):
+        date = get_game_date(state)
+        messages.append({'role': 'user', 'content': f'当前是{date}。请根据时代背景在response中包含\"trend\"字段：{{\"name\":\"趋势名(≤8字)\",\"desc\":\"简短描述(≤20字)\"}}。'})
+
     result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
 
     if error:
@@ -1983,8 +1997,17 @@ def _api_action_impl():
     ending = check_endings(state)
     # I8: Generate industry news (every 12 turns)
     generate_industry_news(state, cfg)
-    # I6: Design trend
+    # I6: Design trend — parse from LLM response or fall back
     trend = get_current_trend(state)
+    if trend is None:
+        llm_trend = result.get('trend', {})
+        if isinstance(llm_trend, dict) and llm_trend.get('name'):
+            trend = {'name': llm_trend['name'], 'desc': llm_trend.get('desc', ''), '_until': state['turn_count'] + 48}
+        else:
+            idx = (state.get('turn_count', 0) // 48) % len(DESIGN_TRENDS)
+            trend = dict(DESIGN_TRENDS[idx])
+            trend['_until'] = state['turn_count'] + 48
+        state['_trend'] = trend
 
     # 4: Memory — track recent choice tendency
     choice_history = state.get('_choice_history', [])
