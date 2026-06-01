@@ -195,18 +195,18 @@ SYSTEM_PROMPT = '''# 平面设计师模拟器 · Game Master
 每回合≈1周。精力0-100，加班消耗，休息恢复。储蓄=工资+奖金-2500月支出。精力<20疲劳叙事，储蓄不足焦虑叙事。
 
 ## choice.effects (结构化数组)
-格式: [{"attr":"审美判断力","delta":1,"text":"审美+1"}, {"attr":"stamina","delta":-8,"text":"精力-8"}]
+格式: [{"attr":"审美判断力","delta":1,"text":"审美+25XP"}, {"attr":"stamina","delta":-8,"text":"精力-8"}]
 attr必须是全称(审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度)，stamina/savings仅用于前端展示。
-+1=25XP(仅属性)，涨属性必须伴随代价。精力/储蓄的实际变化由stamina_change/savings_change字段控制。
+delta=1表示加25XP，delta=2表示加50XP。涨属性必须伴随代价。
 大部分回合trend为flat，高等级(≥15)极少up。作品集仅实际产出时up。
 
 ## 输出格式
 {
   "narrative": "第二人称叙事150-300字",
   "choices": [
-    {"id":"A","text":"≤20字","hint":"≤12字","effects":[{"attr":"审美判断力","delta":1,"text":"审美+1"},{"attr":"stamina","delta":-8,"text":"精力-8"}]},
-    {"id":"B","text":"≤20字","hint":"≤12字","effects":[{"attr":"商业思维","delta":1,"text":"商业+1"}]},
-    {"id":"C","text":"≤20字","hint":"≤12字","effects":[{"attr":"表达","delta":1,"text":"表达+1"},{"attr":"stamina","delta":15,"text":"精力+15"}]}
+    {"id":"A","text":"≤20字","hint":"≤12字","effects":[{"attr":"审美判断力","delta":1,"text":"审美+25XP"},{"attr":"stamina","delta":-8,"text":"精力-8"}]},
+    {"id":"B","text":"≤20字","hint":"≤12字","effects":[{"attr":"商业思维","delta":1,"text":"商业+25XP"}]},
+    {"id":"C","text":"≤20字","hint":"≤12字","effects":[{"attr":"表达","delta":1,"text":"表达+25XP"},{"attr":"stamina","delta":15,"text":"精力+15"}]}
   ],
   "atmosphere": "≤10字",
   "attr_trend": {"审美判断力":"up","执行能力":"flat","商业思维":"up","表达能力":"flat","创意深度":"flat","作品集厚度":"up"},
@@ -363,7 +363,7 @@ def _legacy_effect_to_structured(effect_str):
             if part.startswith(short):
                 try:
                     delta = int(part[len(short):])
-                    result.append({'attr': full, 'delta': delta, 'text': part})
+                    result.append({'attr': full, 'delta': delta, 'text': f'{short}+{delta*25}XP' if delta > 0 else f'{short}{delta*25}XP'})
                 except (ValueError, IndexError):
                     pass
     return result
@@ -374,15 +374,15 @@ def _legacy_effect_to_structured(effect_str):
 def make_fallback_choices(turn_count, attrs):
     '''Always return valid choices, never empty.'''
     base = [
-        {'id': 'A', 'text': '继续当前的工作节奏', 'hint': '稳扎稳打', 'effects': [{'attr': '执行能力', 'delta': 1, 'text': '执行+1'}]},
-        {'id': 'B', 'text': '主动寻求新机会', 'hint': '冒险可能突破', 'effects': [{'attr': '商业思维', 'delta': 1, 'text': '商业+1'}, {'attr': 'stamina', 'delta': -8, 'text': '精力-8'}]},
+        {'id': 'A', 'text': '继续当前的工作节奏', 'hint': '稳扎稳打', 'effects': [{'attr': '执行能力', 'delta': 1, 'text': '执行+25XP'}]},
+        {'id': 'B', 'text': '主动寻求新机会', 'hint': '冒险可能突破', 'effects': [{'attr': '商业思维', 'delta': 1, 'text': '商业+25XP'}, {'attr': 'stamina', 'delta': -8, 'text': '精力-8'}]},
         {'id': 'C', 'text': '停下来复盘和思考', 'hint': '恢复和规划', 'effects': [{'attr': 'stamina', 'delta': 15, 'text': '精力+15'}]},
     ]
     if turn_count % 7 == 0:
         return [
-            {'id': 'A', 'text': '抓住这个转折机会', 'hint': '职业跃升', 'effects': [{'attr': '表达能力', 'delta': 1, 'text': '表达+1'}, {'attr': 'stamina', 'delta': -8, 'text': '精力-8'}]},
-            {'id': 'B', 'text': '谨慎观望再做决定', 'hint': '保守安全', 'effects': [{'attr': '执行能力', 'delta': 2, 'text': '执行+2'}]},
-            {'id': 'C', 'text': '和信任的人商量一下', 'hint': '借助他人视角', 'effects': [{'attr': '表达能力', 'delta': 1, 'text': '表达+1'}]},
+            {'id': 'A', 'text': '抓住这个转折机会', 'hint': '职业跃升', 'effects': [{'attr': '表达能力', 'delta': 1, 'text': '表达+25XP'}, {'attr': 'stamina', 'delta': -8, 'text': '精力-8'}]},
+            {'id': 'B', 'text': '谨慎观望再做决定', 'hint': '保守安全', 'effects': [{'attr': '执行能力', 'delta': 2, 'text': '执行+50XP'}]},
+            {'id': 'C', 'text': '和信任的人商量一下', 'hint': '借助他人视角', 'effects': [{'attr': '表达能力', 'delta': 1, 'text': '表达+25XP'}]},
         ]
     return base
 
