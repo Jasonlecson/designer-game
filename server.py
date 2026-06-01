@@ -258,51 +258,6 @@ def generate_npcs():
 # ============================================================
 # LLM Call
 # ============================================================
-def call_llm_stream(messages, api_base, api_key, model):
-    '''Call LLM with streaming, yields text chunks.'''
-    import requests
-    try:
-        headers = {'Content-Type': 'application/json', 'Authorization': f'Bearer {api_key}'}
-        payload = {
-            'model': model,
-            'messages': messages,
-            'temperature': 0.85,
-            'max_tokens': 1500,
-            'stream': True
-        }
-        resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120, stream=True)
-        if resp.status_code >= 400:
-            payload.pop('response_format', None)
-            resp = requests.post(f'{api_base}/chat/completions', headers=headers, json=payload, timeout=120, stream=True)
-        if resp.status_code != 200:
-            yield None, f'API Error {resp.status_code}'
-            return
-        full_content = ''
-        for line in resp.iter_lines():
-            if not line:
-                continue
-            line = line.decode('utf-8')
-            if line.startswith('data: '):
-                data_str = line[6:]
-                if data_str.strip() == '[DONE]':
-                    break
-                try:
-                    chunk = json.loads(data_str)
-                    delta = chunk.get('choices', [{}])[0].get('delta', {})
-                    content = delta.get('content', '')
-                    if content:
-                        full_content += content
-                        yield content, None
-                except json.JSONDecodeError:
-                    continue
-        # Clean markdown
-        full_content = full_content.replace('```json', '').replace('```', '').strip()
-        yield json.loads(full_content), None
-    except json.JSONDecodeError as e:
-        yield None, f'JSON parse: {str(e)[:100]}'
-    except Exception as e:
-        yield None, f'Call failed: {str(e)[:100]}'
-
 def call_llm(messages, api_base, api_key, model):
     try:
         import requests
@@ -491,10 +446,6 @@ def xp_to_level(xp):
 def level_to_xp_target(level):
     '''XP needed to reach this level from 0.'''
     return level * level * XP_PER_LEVEL_BASE
-
-def xp_for_level_up(current_level):
-    '''XP needed to go from current_level to current_level+1.'''
-    return level_to_xp_target(current_level + 1) - level_to_xp_target(current_level)
 
 def apply_trend_to_xp(state, attr_trends):
     '''Apply LLM trend directions (up/down/flat) as XP changes.
@@ -803,12 +754,6 @@ def get_stamina_status(stamina):
     if stamina >= 20:  return '严重疲劳', 'choices_reduced'
     if stamina >= 10:  return '透支', 'warning'
     return '濒临崩塌', 'forced_rest'
-
-def get_status_debuff(stamina):
-    '''Return additional stamina penalty for exertion choices.'''
-    if stamina < 40: return 5
-    if stamina < 60: return 2
-    return 0
 
 # ============================================================
 # 2. Savings Crisis System — 储蓄危机事件链
@@ -1878,7 +1823,7 @@ def _api_action_impl():
         boost = trait_def['train_boost']
         xp = state.get('attribute_xp', {})
         for attr in applied_effects:
-            bonus = int(50 * (boost - 1.0))  # 20% boost = 10 extra XP per +1
+            bonus = int(25 * (boost - 1.0))  # 20% boost = 5 extra XP per +1
             if bonus > 0:
                 xp[attr] = xp.get(attr, 0) + bonus
         state['attribute_xp'] = xp
