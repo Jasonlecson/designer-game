@@ -158,6 +158,10 @@ body{
 .attr-fill.high{background:var(--success)}
 .attr-fill.mid{background:var(--accent-light)}
 .attr-fill.low{background:#d4846a}
+.attr-pulse{animation:attrPulse 0.5s var(--ease-out)}
+@keyframes attrPulse{0%,100%{transform:scale(1)}50%{transform:scale(1.25)}}
+.attr-float{position:fixed;font-size:0.7rem;font-weight:700;color:var(--accent);pointer-events:none;animation:floatUp 1.2s ease-out forwards;z-index:999}
+@keyframes floatUp{0%{opacity:1;transform:translateY(0)}100%{opacity:0;transform:translateY(-30px)}}
 .npc-item{display:flex;align-items:center;gap:10px;padding:6px 0}
 .npc-dot{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:0.72rem;font-weight:700;color:#fff;flex-shrink:0}
 .npc-info{min-width:0}

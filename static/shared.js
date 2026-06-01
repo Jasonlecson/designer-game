@@ -224,6 +224,19 @@ function restackNotifs() {
   }
 }
 
+// Float-up XP animation on attribute change
+function floatAttrDelta(attrName, deltaText, sourceEl) {
+  if (!sourceEl) return;
+  var rect = sourceEl.getBoundingClientRect();
+  var el = document.createElement('div');
+  el.className = 'attr-float';
+  el.textContent = deltaText;
+  el.style.left = rect.left + 'px';
+  el.style.top = rect.top + 'px';
+  document.body.appendChild(el);
+  setTimeout(function() { el.remove(); }, 1300);
+}
+
 // ========== Process action response ==========
 function processActionResponse(d) {
   updateGameState(d);
@@ -419,11 +432,30 @@ async function makeChoice(choiceId) {
   if (gameState && gameState.stamina <= 0) return;
   isProcessing = true;
   renderLoading(true);
+  var oldAttrs = gameState ? Object.assign({}, gameState.attributes) : {};
   try {
     const d = await API.doAction(choiceId);
     processActionResponse(d);
     isProcessing = false;
     renderAll();
+    // Float-up XP on changed attributes
+    setTimeout(function() {
+      if (!gameState || !gameState.attributes || !oldAttrs) return;
+      for (var k in gameState.attributes) {
+        if (gameState.attributes[k] !== oldAttrs[k]) {
+          var delta = gameState.attributes[k] - (oldAttrs[k] || 0);
+          var el = document.getElementById('sb-attrs');
+          if (!el) continue;
+          var rows = el.querySelectorAll('.attr-value');
+          for (var i = 0; i < rows.length; i++) {
+            if (rows[i].textContent.trim() === String(gameState.attributes[k])) {
+              floatAttrDelta(k, (delta > 0 ? '+' : '') + delta, rows[i]);
+              break;
+            }
+          }
+        }
+      }
+    }, 100);
   } catch (e) {
     renderLoading(false, esc(e.message));
     isProcessing = false;
