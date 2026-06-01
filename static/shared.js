@@ -167,6 +167,11 @@ function formatNarrative(text) {
 }
 function attrClass(v) { return v >= 7 ? 'high' : v >= 4 ? 'mid' : 'low'; }
 function attrColor(v) { return v >= 7 ? '#6b8f71' : v >= 4 ? '#d4a853' : '#d4846a'; }
+function getMonthlySalary() {
+  var map = { '见习设计师':3500, '初级设计师':5000, '中级设计师':8000, '高级设计师':12000, '资深设计师':18000, '设计总监':25000, '创意合伙人':35000, '独立设计大师':50000 };
+  var title = (gameState && gameState.title && gameState.title.title) || '见习设计师';
+  return map[title] || 4000;
+}
 function formatDate(turnCount) {
   if (!gameState || !gameState.start_date) return `第 ${turnCount} 回合`;
   try {
