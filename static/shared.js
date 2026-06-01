@@ -113,6 +113,7 @@ const TAG_COLORS = {
 };
 
 const AVATAR_COLORS = ['#d4846a','#6b8f71','#7b8fa1','#c4a43e','#8e6b9e','#c4755e'];
+const RISK_LABELS = {safe:{label:'安全',color:'#6b8f71',bg:'#edf5ee'},medium:{label:'适中',color:'#c4a43e',bg:'#fdf8e8'},high:{label:'冒险',color:'#d4846a',bg:'#fdf0ed'}};
 
 // ========== Global State ==========
 let gameState = null;

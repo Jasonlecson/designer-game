@@ -204,9 +204,9 @@ delta=1表示加25XP，delta=2表示加50XP。涨属性必须伴随代价。
 {
   "narrative": "第二人称叙事150-300字",
   "choices": [
-    {"id":"A","text":"≤20字","hint":"≤12字","effects":[{"attr":"审美判断力","delta":1,"text":"审美+25XP"},{"attr":"stamina","delta":-8,"text":"精力-8"}]},
-    {"id":"B","text":"≤20字","hint":"≤12字","effects":[{"attr":"商业思维","delta":1,"text":"商业+25XP"}]},
-    {"id":"C","text":"≤20字","hint":"≤12字","effects":[{"attr":"表达","delta":1,"text":"表达+25XP"},{"attr":"stamina","delta":15,"text":"精力+15"}]}
+    {"id":"A","text":"≤20字","hint":"≤12字","risk":"safe","effects":[{"attr":"审美判断力","delta":1,"text":"审美+25XP"},{"attr":"stamina","delta":-8,"text":"精力-8"}]},
+    {"id":"B","text":"≤20字","hint":"≤12字","risk":"medium","effects":[{"attr":"商业思维","delta":1,"text":"商业+25XP"}]},
+    {"id":"C","text":"≤20字","hint":"≤12字","risk":"high","effects":[{"attr":"表达","delta":1,"text":"表达+25XP"},{"attr":"stamina","delta":15,"text":"精力+15"}]}
   ],
   "atmosphere": "≤10字",
   "attr_trend": {"审美判断力":"up","执行能力":"flat","商业思维":"up","表达能力":"flat","创意深度":"flat","作品集厚度":"up"},
@@ -221,7 +221,7 @@ delta=1表示加25XP，delta=2表示加50XP。涨属性必须伴随代价。
 - attr_trend: 每个属性 up/down/flat，后端转XP
 - company_update: 仅重大变动时更新，否则省略
 - npc_updates: 可选，仅涉及NPC时更新
-- choices: 必须2-3个有意义选项。无终点游戏，属性低不代表结束
+- choices: 必须2-3个，每个标注risk(safe/medium/high)，无终点游戏属性低不代表结束
 - 每周1回合，季节影响事件倾向'''
 
 # ============================================================
@@ -1511,6 +1511,16 @@ def build_messages(state, player_action=None, is_forced_rest=False, hospital_fee
         parts.append(f'  [{e.get("event_tag","")}] {e.get("player_action","")[:30]}')
         if e.get('narrative'):
             parts.append(f'  → {e["narrative"][:80]}')
+    # 4: Player tendency hint
+    hist = state.get('_choice_history', [])
+    if len(hist) >= 3:
+        risks = [h.get('risk','') for h in hist[-5:]]
+        safe_count = risks.count('safe')
+        high_count = risks.count('high')
+        if safe_count >= 3:
+            parts.append(f'# 倾向提示: 近期偏保守({safe_count}/5次safe)，可适时推动玩家走出舒适区。')
+        elif high_count >= 3:
+            parts.append(f'# 倾向提示: 近期偏冒险({high_count}/5次high)，可给玩家一些稳定下来的机会。')
     msg = '\n'.join(parts)
 
     messages = [
@@ -1958,6 +1968,12 @@ def _api_action_impl():
     generate_industry_news(state, cfg)
     # I6: Design trend
     trend = get_current_trend(state)
+
+    # 4: Memory — track recent choice tendency
+    choice_history = state.get('_choice_history', [])
+    choice_history.append({'turn': state['turn_count'], 'text': action_text[:30], 'risk': chosen.get('risk', 'medium') if isinstance(chosen, dict) else 'medium'})
+    if len(choice_history) > 5: choice_history = choice_history[-5:]
+    state['_choice_history'] = choice_history
 
     lock = get_player_lock()
     with lock:

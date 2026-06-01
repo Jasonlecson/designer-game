@@ -780,7 +780,9 @@ function renderDashboard(tc) {
         var icon = e.delta > 0 ? '↑' : '↓';
         return '<span class="' + cls + '" title="' + (e.attr || '') + ' ' + (e.delta > 0 ? '+' : '') + e.delta + '">' + icon + ' ' + (e.text || e.attr || '') + '</span>';
       }).join(' ') + '</div>' : '';
-      html += '<button class="choice-btn" data-choice="' + esc(ch.id) + '" ' + (isProcessing ? 'disabled' : '') + '><div class="ch-main">' + esc(ch.text) + '</div><div class="ch-hint">' + esc(ch.hint || '') + '</div>' + effectsHtml + '</button>';
+      var risk = RISK_LABELS[ch.risk] || null;
+      var riskBadge = risk ? '<span class="ch-risk" style="background:' + risk.bg + ';color:' + risk.color + ';font-size:0.65rem;padding:1px 6px;border-radius:3px;margin-left:6px">' + risk.label + '</span>' : '';
+      html += '<button class="choice-btn" data-choice="' + esc(ch.id) + '" ' + (isProcessing ? 'disabled' : '') + '><div class="ch-main">' + esc(ch.text) + riskBadge + '</div><div class="ch-hint">' + esc(ch.hint || '') + '</div>' + effectsHtml + '</button>';
     });
     html += '<button class="choice-btn choice-btn-auto" ' + (isProcessing ? 'disabled' : '') + ' onclick="toggleAA()"><div class="ch-main">⭐ 这个月我想做点别的...</div></button><div class="aa-sub" id="aa-sub">' + buildActiveActionButtons() + '</div></div>';
   }
