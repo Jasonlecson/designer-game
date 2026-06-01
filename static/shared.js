@@ -97,7 +97,7 @@ const STEP_LABELS = ['基本信息', '出身选择', '开局资源', '职业目�
 const ACTIVE_ACTIONS_LIST = [
   {key:'rest_short',name:'☕ 周末休整',desc:'+15精力',disabled:function(st){return st.stamina>=95;}},
   {key:'rest_long',name:'🏖️ 请假休假',desc:'+35精力 -1k',disabled:function(st){return st.stamina>=80||(st.savings||0)<1000;}},
-  {key:'portfolio',name:'🎨 整理作品集',desc:'作品+200XP -5精力',disabled:function(st){return(st.attributes['作品集厚度']||0)>=10;}},
+  {key:'portfolio',name:'🎨 整理作品集',desc:'作品+1 -5精力',disabled:function(st){return(st.attributes['作品集厚度']||0)>=20;}},
   {key:'train',name:'📚 报班学习',desc:'属性+50XP -3k',disabled:function(st){return(st.savings||0)<3000;}},
   {key:'train_intensive',name:'🎓 封闭集训',desc:'属性+100XP -8k -20精力',disabled:function(st){return(st.savings||0)<8000||st.stamina<30;}},
   {key:'jobhunt_targeted',name:'🎯 精准投递',desc:'-15精力 投3家公司',disabled:function(st){return st.stamina<20;}},

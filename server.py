@@ -187,8 +187,8 @@ SYSTEM_PROMPT = '''# 平面设计师模拟器 · Game Master
 你是DM，负责叙事/NPC/事件/属性。写实向、非爽文、无恋爱线。女主非天才，成长需代价。每3-4回合至少一次正面时刻（客户认可/同事帮忙/作品被赞/小奖金/成长感）。挫折后有回弹，低谷后有光亮。
 **叙事中禁止出现精力/储蓄的具体数字**（如\"精力80\"\"储蓄3000元\"），用定性描述替代（\"精神饱满\"\"钱包吃紧\"）。UI会自动显示精确数值。
 
-## 属性 (1-20级XP累积制)
-审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度
+## 属性 (1-20级)
+前5项XP累积制(审美/执行/商业/表达/创意)，作品集厚度为直接计数(每完成1项目+1)
 等级由后端公式自动计算，你只输出趋势方向(up/down/flat)。
 
 ## 时间·资源
@@ -198,7 +198,7 @@ SYSTEM_PROMPT = '''# 平面设计师模拟器 · Game Master
 格式: [{"attr":"审美判断力","delta":1,"text":"审美+25XP"}, {"attr":"stamina","delta":-8,"text":"精力-8"}]
 attr必须是全称(审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度)，stamina/savings仅用于前端展示。
 delta=1表示加25XP，delta=2表示加50XP。涨属性必须伴随代价。
-大部分回合trend为flat，高等级(≥15)极少up。作品集仅实际产出时up。
+大部分回合trend为flat，高等级(≥15)极少up。作品集厚度仅完成项目时up(+1)。
 
 ## 输出格式
 {
@@ -522,6 +522,14 @@ def apply_trend_to_xp(state, attr_trends):
     boosts = GOAL_BOOST.get(goal, {})
     deltas = {}
     for attr, trend in (attr_trends or {}).items():
+        # 作品集厚度 = direct counter
+        if attr == '作品集厚度':
+            if trend == 'up':
+                count = state.get('_portfolio_count', len(state.get('portfolio', [])))
+                state['_portfolio_count'] = min(20, count + 1)
+                state['attributes'][attr] = state['_portfolio_count']
+                deltas[attr] = 1
+            continue
         if trend == 'up':
             delta = random.randint(15, 35)
         elif trend == 'down':
@@ -539,12 +547,14 @@ def apply_trend_to_xp(state, attr_trends):
     return deltas
 
 def xp_to_attrs(state):
-    '''Derive attribute levels from XP.'''
+    '''Derive attribute levels from XP. 作品集厚度 is a direct counter (not XP).'''
     xp_dict = state.get('attribute_xp', {})
     attrs = {}
-    ALL_ATTRS = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度', '作品集厚度']
-    for attr in ALL_ATTRS:
+    XP_ATTRS = ['审美判断力', '执行能力', '商业思维', '表达能力', '创意深度']
+    for attr in XP_ATTRS:
         attrs[attr] = xp_to_level(xp_dict.get(attr, 0))
+    # 作品集厚度 = direct project count
+    attrs['作品集厚度'] = state.get('_portfolio_count', len(state.get('portfolio', [])))
     return attrs
 
 def apply_effect_xp(state, choice_effect):
@@ -599,8 +609,16 @@ def apply_effect_xp(state, choice_effect):
         if not attr or not delta:
             continue
         # stamina/savings are handled by LLM's stamina_change/savings_change
-        # Apply only attribute XP here
         if attr in ('stamina', 'savings'):
+            continue
+        # 作品集厚度 = direct counter (not XP)
+        if attr == '作品集厚度':
+            count = state.get('_portfolio_count', len(state.get('portfolio', [])))
+            old_lvl = count
+            state['_portfolio_count'] = max(0, count + delta)
+            state['attributes'][attr] = state['_portfolio_count']
+            if state['_portfolio_count'] != old_lvl:
+                level_changes[attr] = state['_portfolio_count'] - old_lvl
             continue
         xp_delta = XP_PER_EFFECT_POINT * delta
         old_level = xp_to_level(xp.get(attr, 0))
@@ -880,12 +898,14 @@ def advance_project_phase(state):
         proj['phase'] = '交付'; phases_progressed = True
     if progress >= 1.0 and proj.get('phase') in ('交付', '改稿'):
         proj['phase'] = '完成'; phases_progressed = True
-        # Completion reward — add XP (not direct level)
+        # Completion reward
         state['savings'] = state.get('savings', 0) + proj.get('budget', 5000)
         xp = state.get('attribute_xp', {})
-        xp['作品集厚度'] = xp.get('作品集厚度', 0) + 200
         xp['商业思维'] = xp.get('商业思维', 0) + 200
         state['attribute_xp'] = xp
+        # 作品集厚度 = direct counter
+        count = state.get('_portfolio_count', len(state.get('portfolio', [])))
+        state['_portfolio_count'] = min(20, count + 1)
         state['attributes'] = xp_to_attrs(state)
         # Record to portfolio + cooldown
         add_portfolio_entry(state, proj)
@@ -2358,7 +2378,7 @@ ACTIVE_ACTIONS = {
     'rest_long': {'name': '请假休假', 'cost': {'savings': -1000}, 'effect': '精力+35', 'desc': '请假一周，深度恢复', 'icon': '🏖️'},
     'train': {'name': '报班学习', 'cost': {'savings': -3000}, 'effect': '属性+50XP', 'desc': '选择一项属性进行提升', 'icon': '📚'},
     'train_intensive': {'name': '封闭集训', 'cost': {'savings': -8000, 'stamina': -20}, 'effect': '属性+100XP', 'desc': '高强度集训', 'icon': '🎓'},
-    'portfolio': {'name': '整理作品集', 'cost': {'stamina': -5}, 'effect': '作品集+200XP', 'desc': '花时间打磨你的作品展示', 'icon': '🎨'},
+    'portfolio': {'name': '整理作品集', 'cost': {'stamina': -5}, 'effect': '作品集+1', 'desc': '花时间打磨你的作品展示', 'icon': '🎨'},
     'jobhunt_targeted': {'name': '精准投递', 'cost': {'stamina': -15}, 'effect': '投3家公司', 'desc': '精挑细选目标公司投递', 'icon': '🎯'},
     'networking': {'name': '社交拓展', 'cost': {'savings': -1500, 'stamina': -8}, 'effect': '触发NPC接触', 'desc': '参加行业活动拓展人脉', 'icon': '🤝'},
 }
@@ -2414,9 +2434,8 @@ def api_active_action():
         action_context = f'主动行动：请了一周假，深度休息，精力恢复+35。但项目进度可能受到了一些影响。'
         result_msg = '精力 +35'
     elif action_key == 'portfolio':
-        xp = state.get('attribute_xp', {})
-        xp['作品集厚度'] = xp.get('作品集厚度', 0) + 200
-        state['attribute_xp'] = xp
+        count = state.get('_portfolio_count', len(state.get('portfolio', [])))
+        state['_portfolio_count'] = min(20, count + 1)
         state['attributes'] = xp_to_attrs(state)
         action_context = f'主动行动：花了大量时间整理和打磨作品集。这段时间你的设计产出减少了，但作品质量在提升。'
         result_msg = '作品集厚度提升'
