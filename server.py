@@ -197,7 +197,7 @@ SYSTEM_PROMPT = '''# 平面设计师模拟器 · Game Master
 ## choice.effects (结构化数组)
 格式: [{"attr":"审美判断力","delta":1,"text":"审美+1"}, {"attr":"stamina","delta":-8,"text":"精力-8"}]
 attr必须是全称(审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度)，stamina/savings仅用于前端展示。
-+1=50XP(仅属性)，涨属性必须伴随代价。精力/储蓄的实际变化由stamina_change/savings_change字段控制。
++1=25XP(仅属性)，涨属性必须伴随代价。精力/储蓄的实际变化由stamina_change/savings_change字段控制。
 大部分回合trend为flat，高等级(≥15)极少up。作品集仅实际产出时up。
 
 ## 输出格式
@@ -588,7 +588,7 @@ def apply_effect_xp(state, choice_effect):
     else:
         return level_changes
 
-    XP_PER_EFFECT_POINT = 50
+    XP_PER_EFFECT_POINT = 25
     xp = state.get('attribute_xp', {})
 
     for ef in effects_list:
