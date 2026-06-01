@@ -195,8 +195,9 @@ SYSTEM_PROMPT = '''# 平面设计师模拟器 · Game Master
 
 ## choice.effects (结构化数组)
 格式: [{"attr":"审美判断力","delta":1,"text":"审美+1"}, {"attr":"stamina","delta":-8,"text":"精力-8"}]
-attr必须是全称(审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度)，stamina/savings用于精力储蓄。
-+1=50XP，涨属性必须伴随代价。大部分回合trend为flat，高等级(≥15)极少up。作品集仅实际产出时up。
+attr必须是全称(审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度)，stamina/savings仅用于前端展示。
++1=50XP(仅属性)，涨属性必须伴随代价。精力/储蓄的实际变化由stamina_change/savings_change字段控制。
+大部分回合trend为flat，高等级(≥15)极少up。作品集仅实际产出时up。
 
 ## 输出格式
 {
@@ -596,17 +597,16 @@ def apply_effect_xp(state, choice_effect):
         delta = ef.get('delta', 0)
         if not attr or not delta:
             continue
-        if attr == 'stamina':
-            state['stamina'] = max(0, min(100, state.get('stamina', 80) + delta))
-        elif attr == 'savings':
-            state['savings'] = max(0, state.get('savings', 3000) + delta)
-        else:
-            xp_delta = XP_PER_EFFECT_POINT * delta
-            old_level = xp_to_level(xp.get(attr, 0))
-            xp[attr] = xp.get(attr, 0) + xp_delta
-            new_level = xp_to_level(xp[attr])
-            if new_level != old_level:
-                level_changes[attr] = new_level - old_level
+        # stamina/savings are handled by LLM's stamina_change/savings_change
+        # Apply only attribute XP here
+        if attr in ('stamina', 'savings'):
+            continue
+        xp_delta = XP_PER_EFFECT_POINT * delta
+        old_level = xp_to_level(xp.get(attr, 0))
+        xp[attr] = xp.get(attr, 0) + xp_delta
+        new_level = xp_to_level(xp[attr])
+        if new_level != old_level:
+            level_changes[attr] = new_level - old_level
 
     state['attribute_xp'] = xp
     return level_changes
