@@ -206,7 +206,7 @@ delta=1表示加25XP，delta=2表示加50XP。涨属性必须伴随代价。
   "choices": [
     {"id":"A","text":"≤20字","hint":"≤12字","risk":"safe","effects":[{"attr":"审美判断力","delta":1,"text":"审美+25XP"},{"attr":"stamina","delta":-8,"text":"精力-8"}]},
     {"id":"B","text":"≤20字","hint":"≤12字","risk":"medium","effects":[{"attr":"商业思维","delta":1,"text":"商业+25XP"}]},
-    {"id":"C","text":"≤20字","hint":"≤12字","risk":"high","effects":[{"attr":"表达","delta":1,"text":"表达+25XP"},{"attr":"stamina","delta":15,"text":"精力+15"}]}
+    {"id":"C","text":"≤20字","hint":"≤12字","risk":"high","effects":[{"attr":"表达能力","delta":1,"text":"表达+25XP"},{"attr":"stamina","delta":15,"text":"精力+15"}]}
   ],
   "atmosphere": "≤10字",
   "attr_trend": {"审美判断力":"up","执行能力":"flat","商业思维":"up","表达能力":"flat","创意深度":"flat","作品集厚度":"up"},
