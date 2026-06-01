@@ -977,7 +977,7 @@ ENHANCED_ACTIONS = {
     'train': {'name': '报班学习', 'cost': {'savings': -3000}, 'effect': '自选属性+1（持续3回合缓升）', 'icon': '📚'},
     'train_intensive': {'name': '封闭集训', 'cost': {'savings': -8000, 'stamina': -20}, 'effect': '自选属性+2（一次性）', 'icon': '🎓'},
     'jobhunt_targeted': {'name': '精准投递', 'cost': {'stamina': -15}, 'effect': '投3家公司，不同回复概率', 'icon': '🎯'},
-    'portfolio': {'name': '整理作品集', 'cost': {'stamina': -5}, 'effect': '作品集+1', 'icon': '🎨'},
+    'portfolio': {'name': '整理作品集', 'cost': {'stamina': -5}, 'effect': '作品集+200XP', 'icon': '🎨'},
     'networking': {'name': '社交拓展', 'cost': {'savings': -1500, 'stamina': -8}, 'effect': '随机触发NPC接触事件', 'icon': '🤝'},
 }
 
@@ -2262,7 +2262,7 @@ def api_npc_options():
         options.append({
             'id': 'respond_event',
             'text': f'回应：{event_text[:20]}...',
-            'effect': '表达+1',
+            'effect': '表达+25XP',
             'stamina_cost': 2,
             'available': True,
             'is_response': True,
@@ -2356,9 +2356,9 @@ def api_portfolio_generate():
 ACTIVE_ACTIONS = {
     'rest_short': {'name': '周末休整', 'cost': {}, 'effect': '精力+15', 'desc': '休息两天，恢复精力', 'icon': '☕'},
     'rest_long': {'name': '请假休假', 'cost': {'savings': -1000}, 'effect': '精力+35', 'desc': '请假一周，深度恢复', 'icon': '🏖️'},
-    'train': {'name': '报班学习', 'cost': {'savings': -3000}, 'effect': '某属性+1', 'desc': '选择一项属性进行提升', 'icon': '📚'},
-    'train_intensive': {'name': '封闭集训', 'cost': {'savings': -8000, 'stamina': -20}, 'effect': '自选属性+2', 'desc': '高强度集训', 'icon': '🎓'},
-    'portfolio': {'name': '整理作品集', 'cost': {'stamina': -5}, 'effect': '作品集厚度+1', 'desc': '花时间打磨你的作品展示', 'icon': '🎨'},
+    'train': {'name': '报班学习', 'cost': {'savings': -3000}, 'effect': '属性+50XP', 'desc': '选择一项属性进行提升', 'icon': '📚'},
+    'train_intensive': {'name': '封闭集训', 'cost': {'savings': -8000, 'stamina': -20}, 'effect': '属性+100XP', 'desc': '高强度集训', 'icon': '🎓'},
+    'portfolio': {'name': '整理作品集', 'cost': {'stamina': -5}, 'effect': '作品集+200XP', 'desc': '花时间打磨你的作品展示', 'icon': '🎨'},
     'jobhunt_targeted': {'name': '精准投递', 'cost': {'stamina': -15}, 'effect': '投3家公司', 'desc': '精挑细选目标公司投递', 'icon': '🎯'},
     'networking': {'name': '社交拓展', 'cost': {'savings': -1500, 'stamina': -8}, 'effect': '触发NPC接触', 'desc': '参加行业活动拓展人脉', 'icon': '🤝'},
 }
