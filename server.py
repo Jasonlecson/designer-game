@@ -1916,7 +1916,7 @@ def _api_action_impl():
     # I6: Design trend — ask LLM to refresh every 48 turns
     if trend_needs_update(state):
         date = get_game_date(state)
-        messages.append({'role': 'user', 'content': f'当前是{date}。请根据时代背景在response中包含\"trend\"字段：{{\"name\":\"趋势名(≤8字)\",\"desc\":\"简短描述(≤20字)\"}}。'})
+        messages.append({'role': 'user', 'content': f'当前是{date}。请根据时代背景在response中包含\"trend\"字段：{{\"name\":\"趋势名(≤8字)\",\"desc\":\"简短描述(≤20字)\",\"boost_attr\":\"受追捧的属性\",\"penalty_attr\":\"被冷落的属性\"}}。属性限:审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度。'})
 
     result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
 
@@ -2438,6 +2438,9 @@ def api_active_action():
 
     # Call LLM to narrate this active action month + generate next choices
     messages = build_messages(state, f'{action["name"]}：{action_context}')
+    if trend_needs_update(state):
+        date = get_game_date(state)
+        messages.append({'role': 'user', 'content': f'当前是{date}。请在response中包含\"trend\"字段：{{\"name\":\"趋势名(≤8字)\",\"desc\":\"≤20字\",\"boost_attr\":\"受追捧属性\",\"penalty_attr\":\"被冷落属性\"}}。属性限:审美判断力/执行能力/商业思维/表达能力/创意深度/作品集厚度。'})
     result, error = call_llm(messages, cfg['api_base'], cfg['api_key'], cfg['model'])
     if error:
         result = validate_and_fix_result({}, state['turn_count'], state['attributes'])
@@ -2470,6 +2473,18 @@ def api_active_action():
     cd = state.get('_project_cooldown', 0)
     if cd > 0:
         state['_project_cooldown'] = cd - 1
+
+    # I6: Design trend — parse from LLM response or fall back
+    trend = get_current_trend(state)
+    if trend is None:
+        llm_trend = result.get('trend', {})
+        if isinstance(llm_trend, dict) and llm_trend.get('name'):
+            trend = {'name': llm_trend['name'], 'desc': llm_trend.get('desc', ''), 'boost_attr': llm_trend.get('boost_attr',''), 'penalty_attr': llm_trend.get('penalty_attr',''), '_until': state['turn_count'] + 48}
+        else:
+            idx = (state.get('turn_count', 0) // 48) % len(DESIGN_TRENDS)
+            trend = dict(DESIGN_TRENDS[idx])
+            trend['_until'] = state['turn_count'] + 48
+        state['_trend'] = trend
 
     # Run all post-turn systems (same as api_action)
     arc_msg = detect_and_start_arc(state)
@@ -2525,6 +2540,7 @@ def api_active_action():
         'status_debuff': status_debuff,
         'trait': state.get('trait'),
         'turn': turn,
+        'trend': trend,
     })
 
 # ============================================================

@@ -767,7 +767,7 @@ function renderAll() {
   document.getElementById('mh-sub').textContent = (gameState.title?.title || '') + ' · ' + (gameState.game_date || '');
   var trendEl = document.getElementById('mh-trend');
   if (trendEl && gameState.trend) {
-    trendEl.textContent = '📐 当前趋势：' + gameState.trend.name + '（' + gameState.trend.boost_attr + '↑ / ' + gameState.trend.penalty_attr + '↓）';
+    trendEl.textContent = '📐 ' + gameState.trend.name + (gameState.trend.desc ? ' · ' + gameState.trend.desc : '');
     trendEl.style.display = '';
   } else if (trendEl) trendEl.style.display = 'none';
   if (window._pendingEnding) { showEnding(window._pendingEnding); window._pendingEnding = null; }
