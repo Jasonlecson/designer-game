@@ -2125,34 +2125,34 @@ def api_reset():
 # ============================================================
 NPC_INTERACTIONS = {
     '行业前辈/导师': [
-        {'id': 'ask_advice', 'text': '请教职业建议', 'effect': '表达+1', 'stamina_cost': 5},
-        {'id': 'show_work', 'text': '展示作品集', 'effect': '审美+1', 'stamina_cost': 8},
-        {'id': 'ask_referral', 'text': '请求内推机会', 'effect': '商业+1', 'stamina_cost': 10},
+        {'id': 'ask_advice', 'text': '请教职业建议', 'effect': '表达+25XP', 'stamina_cost': 5},
+        {'id': 'show_work', 'text': '展示作品集', 'effect': '审美+25XP', 'stamina_cost': 8},
+        {'id': 'ask_referral', 'text': '请求内推机会', 'effect': '商业+25XP', 'stamina_cost': 10},
     ],
     '竞争对手': [
-        {'id': 'observe', 'text': '观察对方动态', 'effect': '商业+1', 'stamina_cost': 3},
-        {'id': 'compete', 'text': '主动竞争', 'effect': '执行+1 审美-1', 'stamina_cost': 12},
-        {'id': 'collaborate', 'text': '寻求合作可能', 'effect': '表达+1', 'stamina_cost': 8},
+        {'id': 'observe', 'text': '观察对方动态', 'effect': '商业+25XP', 'stamina_cost': 3},
+        {'id': 'compete', 'text': '主动竞争', 'effect': '执行+25XP 审美-25XP', 'stamina_cost': 12},
+        {'id': 'collaborate', 'text': '寻求合作可能', 'effect': '表达+25XP', 'stamina_cost': 8},
     ],
     '甲方/客户': [
-        {'id': 'pitch', 'text': '主动提案', 'effect': '商业+1', 'stamina_cost': 10},
-        {'id': 'feedback', 'text': '收集反馈', 'effect': '审美+1', 'stamina_cost': 5},
-        {'id': 'maintain', 'text': '维护关系', 'effect': '表达+1', 'stamina_cost': 6},
+        {'id': 'pitch', 'text': '主动提案', 'effect': '商业+25XP', 'stamina_cost': 10},
+        {'id': 'feedback', 'text': '收集反馈', 'effect': '审美+25XP', 'stamina_cost': 5},
+        {'id': 'maintain', 'text': '维护关系', 'effect': '表达+25XP', 'stamina_cost': 6},
     ],
     '合作者/搭档': [
-        {'id': 'brainstorm', 'text': '头脑风暴', 'effect': '创意+1', 'stamina_cost': 8},
-        {'id': 'divide_work', 'text': '分工协作', 'effect': '执行+1', 'stamina_cost': 6},
+        {'id': 'brainstorm', 'text': '头脑风暴', 'effect': '创意+25XP', 'stamina_cost': 8},
+        {'id': 'divide_work', 'text': '分工协作', 'effect': '执行+25XP', 'stamina_cost': 6},
         {'id': 'social', 'text': '社交闲聊', 'effect': '精力+10', 'stamina_cost': -10},
     ],
     '行业暗流': [
-        {'id': 'gossip', 'text': '打听内幕', 'effect': '商业+1', 'stamina_cost': 5},
+        {'id': 'gossip', 'text': '打听内幕', 'effect': '商业+25XP', 'stamina_cost': 5},
         {'id': 'caution', 'text': '保持距离', 'effect': '无变化', 'stamina_cost': 0},
-        {'id': 'confront', 'text': '正面交锋', 'effect': '执行+1 表达-1', 'stamina_cost': 12},
+        {'id': 'confront', 'text': '正面交锋', 'effect': '执行+25XP 表达-25XP', 'stamina_cost': 12},
     ],
     '职场关系': [
         {'id': 'chat', 'text': '日常闲聊', 'effect': '精力+5', 'stamina_cost': -5},
-        {'id': 'help', 'text': '提供帮助', 'effect': '表达+1', 'stamina_cost': 8},
-        {'id': 'network', 'text': '拓展人脉', 'effect': '商业+1', 'stamina_cost': 10},
+        {'id': 'help', 'text': '提供帮助', 'effect': '表达+25XP', 'stamina_cost': 8},
+        {'id': 'network', 'text': '拓展人脉', 'effect': '商业+25XP', 'stamina_cost': 10},
     ],
 }
 
@@ -2184,7 +2184,7 @@ def api_npc_interact():
         pid = get_session_id()
         if pid in _npc_pending_events and npc_id in _npc_pending_events[pid]:
             event_text = _npc_pending_events[pid].pop(npc_id, '')
-            action = {'id': 'respond_event', 'text': f'回应：{event_text[:20]}...', 'effect': '表达+1', 'stamina_cost': 2}
+            action = {'id': 'respond_event', 'text': f'回应：{event_text[:20]}...', 'effect': '表达+25XP', 'stamina_cost': 2}
         else:
             return jsonify({'error': '没有待回应的消息'}), 400
     else:
