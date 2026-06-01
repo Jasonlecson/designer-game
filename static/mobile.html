@@ -546,32 +546,41 @@ function renderCreateStep() {
   } else if (createStep === 1) {
     ORIGINS.forEach(function(o) {
       var sel = selections.origin === o.id ? ' selected' : '';
-      html += '<div class="select-card' + sel + '" onclick="selectOpt(\'origin\',\'' + o.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + o.id + '. ' + o.title + '</div><div class="sc-desc">' + o.desc + '</div><div class="sc-tags">' + (o.good ? '<span class="sc-tag-good">✦ ' + o.good + '</span>' : '') + (o.warn ? '<span class="sc-tag-warn">△ ' + o.warn + '</span>' : '') + '</div></div></div>';
+      html += '<div class="select-card' + sel + '" data-opt-type="origin" data-opt-id="' + o.id + '" onclick="selectOpt(\'origin\',\'' + o.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + o.id + '. ' + o.title + '</div><div class="sc-desc">' + o.desc + '</div><div class="sc-tags">' + (o.good ? '<span class="sc-tag-good">✦ ' + o.good + '</span>' : '') + (o.warn ? '<span class="sc-tag-warn">△ ' + o.warn + '</span>' : '') + '</div></div></div>';
     });
     html += '<div class="field"><label>自定义描述（选G需填）</label><input id="custom-origin" placeholder="描述你的职业"></div>';
     html += '<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=0;renderCreateStep()">←</button><button class="btn btn-primary" onclick="nextStep()">下一步</button></div>';
   } else if (createStep === 2) {
     RESOURCES.forEach(function(r) {
       var sel = selections.resources === r.id ? ' selected' : '';
-      html += '<div class="select-card' + sel + '" onclick="selectOpt(\'resources\',\'' + r.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + r.id + '. ' + r.title + '</div><div class="sc-desc">' + r.desc + '</div></div></div>';
+      html += '<div class="select-card' + sel + '" data-opt-type="resources" data-opt-id="' + r.id + '" onclick="selectOpt(\'resources\',\'' + r.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + r.id + '. ' + r.title + '</div><div class="sc-desc">' + r.desc + '</div></div></div>';
     });
     html += '<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=1;renderCreateStep()">←</button><button class="btn btn-primary" onclick="nextStep()">下一步</button></div>';
   } else if (createStep === 3) {
     GOALS.forEach(function(g) {
       var sel = selections.goal === g.id ? ' selected' : '';
-      html += '<div class="select-card' + sel + '" onclick="selectOpt(\'goal\',\'' + g.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + g.id + '. ' + g.title + '</div><div class="sc-desc">' + g.desc + '</div></div></div>';
+      html += '<div class="select-card' + sel + '" data-opt-type="goal" data-opt-id="' + g.id + '" onclick="selectOpt(\'goal\',\'' + g.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + g.id + '. ' + g.title + '</div><div class="sc-desc">' + g.desc + '</div></div></div>';
     });
     html += '<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=2;renderCreateStep()">←</button><button class="btn btn-primary" onclick="nextStep()">下一步</button></div>';
   } else {
     // Step 4 — Pace (mobile has 5 steps, step 4 is pace, startGame directly)
     PACES.forEach(function(p) {
       var sel = selections.pace === p.id ? ' selected' : '';
-      html += '<div class="select-card' + sel + '" onclick="selectOpt(\'pace\',\'' + p.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + p.id + '. ' + p.title + '</div><div class="sc-desc">' + p.desc + '</div></div></div>';
+      html += '<div class="select-card' + sel + '" data-opt-type="pace" data-opt-id="' + p.id + '" onclick="selectOpt(\'pace\',\'' + p.id + '\')"><div class="sc-dot"></div><div class="sc-body"><div class="sc-title">' + p.id + '. ' + p.title + '</div><div class="sc-desc">' + p.desc + '</div></div></div>';
     });
     html += '<div class="create-nav"><button class="btn btn-secondary" onclick="createStep=3;renderCreateStep()">←</button><button class="btn btn-primary" onclick="startGame()">✦ 开始</button></div>';
   }
 
   el.innerHTML = html;
+}
+
+// Override selectOpt: targeted DOM update (prevents flash on selection)
+function selectOpt(type, id) {
+  selections[type] = id;
+  var cards = document.querySelectorAll('.select-card[data-opt-type="' + type + '"]');
+  for (var i = 0; i < cards.length; i++) {
+    cards[i].classList.toggle('selected', cards[i].getAttribute('data-opt-id') === id);
+  }
 }
 
 // Override nextStep for mobile field IDs and step logic

@@ -459,38 +459,47 @@ function renderCreateStep() {
   } else if (createStep === 1) {
     html += '<div class="create-step active">';
     ORIGINS.forEach(function(o) {
-      html += '<div class="select-card' + (selections.origin === o.id ? ' selected' : '') + '" onclick="selectOpt(\'origin\',\'' + o.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + o.id + '. ' + o.title + '</div><div class="sc-desc">' + o.desc + '</div><div class="sc-tags">' + (o.good ? '<span class="sc-tag-good">✦ ' + o.good + '</span>' : '') + (o.warn ? '<span class="sc-tag-warn">△ ' + o.warn + '</span>' : '') + '</div></div></div>';
+      html += '<div class="select-card' + (selections.origin === o.id ? ' selected' : '') + '" data-opt-type="origin" data-opt-id="' + o.id + '" onclick="selectOpt(\'origin\',\'' + o.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + o.id + '. ' + o.title + '</div><div class="sc-desc">' + o.desc + '</div><div class="sc-tags">' + (o.good ? '<span class="sc-tag-good">✦ ' + o.good + '</span>' : '') + (o.warn ? '<span class="sc-tag-warn">△ ' + o.warn + '</span>' : '') + '</div></div></div>';
     });
     html += '<div class="field"><label>自定义（选G需填）</label><input id="custom-origin" value="' + esc(currentPlayer.custom_origin || '') + '"></div>';
     html += '<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=0;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>';
   } else if (createStep === 2) {
     html += '<div class="create-step active">';
     RESOURCES.forEach(function(r) {
-      html += '<div class="select-card' + (selections.resources === r.id ? ' selected' : '') + '" onclick="selectOpt(\'resources\',\'' + r.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + r.id + '. ' + r.title + '</div><div class="sc-desc">' + r.desc + '</div></div></div>';
+      html += '<div class="select-card' + (selections.resources === r.id ? ' selected' : '') + '" data-opt-type="resources" data-opt-id="' + r.id + '" onclick="selectOpt(\'resources\',\'' + r.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + r.id + '. ' + r.title + '</div><div class="sc-desc">' + r.desc + '</div></div></div>';
     });
     html += '<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=1;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>';
   } else if (createStep === 3) {
     html += '<div class="create-step active">';
     GOALS.forEach(function(g) {
-      html += '<div class="select-card' + (selections.goal === g.id ? ' selected' : '') + '" onclick="selectOpt(\'goal\',\'' + g.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + g.id + '. ' + g.title + '</div><div class="sc-desc">' + g.desc + '</div></div></div>';
+      html += '<div class="select-card' + (selections.goal === g.id ? ' selected' : '') + '" data-opt-type="goal" data-opt-id="' + g.id + '" onclick="selectOpt(\'goal\',\'' + g.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + g.id + '. ' + g.title + '</div><div class="sc-desc">' + g.desc + '</div></div></div>';
     });
     html += '<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=2;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>';
   } else if (createStep === 4) {
     html += '<div class="create-step active">';
     PACES.forEach(function(p) {
-      html += '<div class="select-card' + (selections.pace === p.id ? ' selected' : '') + '" onclick="selectOpt(\'pace\',\'' + p.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + p.id + '. ' + p.title + '</div><div class="sc-desc">' + p.desc + '</div></div></div>';
+      html += '<div class="select-card' + (selections.pace === p.id ? ' selected' : '') + '" data-opt-type="pace" data-opt-id="' + p.id + '" onclick="selectOpt(\'pace\',\'' + p.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + p.id + '. ' + p.title + '</div><div class="sc-desc">' + p.desc + '</div></div></div>';
     });
     html += '<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=3;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="nextStep()">下一步 →</button></div></div>';
   } else {
     // Step 5 — Specialization
     html += '<div class="create-step active">';
     SPECIALIZATIONS.forEach(function(s) {
-      html += '<div class="select-card' + (selections.specialization === s.id ? ' selected' : '') + '" onclick="selectOpt(\'specialization\',\'' + s.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + s.icon + ' ' + s.name + '</div><div class="sc-desc">' + s.desc + '  · 专精属性: <b style="color:var(--accent)">' + s.attr + '+2</b></div></div></div>';
+      html += '<div class="select-card' + (selections.specialization === s.id ? ' selected' : '') + '" data-opt-type="specialization" data-opt-id="' + s.id + '" onclick="selectOpt(\'specialization\',\'' + s.id + '\')"><div class="sc-radio"></div><div class="sc-body"><div class="sc-title">' + s.icon + ' ' + s.name + '</div><div class="sc-desc">' + s.desc + '  · 专精属性: <b style="color:var(--accent)">' + s.attr + '+2</b></div></div></div>';
     });
     html += '<div class="create-nav"><button class="btn btn-secondary btn-back" onclick="createStep=4;renderCreateStep()">← 上一步</button><button class="btn btn-primary" onclick="startGame()">✦ 开始职业生涯</button></div></div>';
   }
   html += '</div>';
   el.innerHTML = html;
+}
+
+// Override selectOpt: targeted DOM update instead of full re-render (prevents flash)
+function selectOpt(type, id) {
+  selections[type] = id;
+  var cards = document.querySelectorAll('.select-card[data-opt-type="' + type + '"]');
+  for (var i = 0; i < cards.length; i++) {
+    cards[i].classList.toggle('selected', cards[i].getAttribute('data-opt-id') === id);
+  }
 }
 
 // Override nextStep to match desktop field IDs (p-name etc.)
